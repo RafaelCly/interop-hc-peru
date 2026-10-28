@@ -76,7 +76,7 @@ def allergy(aid, pid, sustancia, reaccion, establecimiento) -> dict:
             "code": "active"}]},
         "code": {"text": sustancia},
         "patient": {"reference": f"Patient/{pid}"},
-        "reaction": [{"description": reaccion}],
+        "reaction": [{"manifestation": [{"text": reaccion}], "description": reaccion}],
         "recorder": {"display": establecimiento},
     }
 

@@ -77,6 +77,20 @@ python -m pytest
 
 Para ver la tolerancia a fallos, haga clic en el nombre de un sistema en la cabecera para simular su caída.
 
+## Validación con servicios externos
+
+Dos scripts (no son dependencias de la aplicación) contrastan el prototipo con servicios públicos:
+
+```bash
+python scripts/validar_fhir.py      # valida los recursos contra el servidor FHIR R4 público de HAPI
+python scripts/verificar_loinc.py   # comprueba los códigos LOINC contra un servidor de terminología (tx.fhir.org)
+```
+
+- Solo se envían datos ficticios. Son servidores públicos de prueba y pueden cambiar o limitar el uso, por lo que
+  no se consumen desde la aplicación en ejecución.
+- El servidor HAPI público no incluye los CodeSystem de LOINC ni de CIE-10, así que esos códigos se verifican con el
+  servidor de terminología.
+
 ## Estructura
 
 ```
