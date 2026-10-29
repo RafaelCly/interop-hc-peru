@@ -100,11 +100,11 @@ p { text-wrap: pretty; }
 }
 .ecg-mov { will-change: transform; }
 @media (prefers-reduced-motion: no-preference) {
-  .ecg-mov { animation: ecg-avanza 2.6s linear infinite; animation-play-state: paused; }
+  .ecg-mov { animation: ecg-avanza 10.4s linear infinite; animation-play-state: paused; }
   [data-vista="true"] .ecg-mov { animation-play-state: running; }
   .entrada { animation: subir 0.8s var(--ease-out-expo) both; animation-delay: var(--d, 0s); }
 }
-@keyframes ecg-avanza { to { transform: translate3d(-246px, 0, 0); } }
+@keyframes ecg-avanza { to { transform: translate3d(-984px, 0, 0); } }
 @keyframes subir { from { opacity: 0; transform: translateY(14px); } }
 
 /* Cinta de casos: se mueve sola, se pausa con el mouse o el foco y no usa barra de desplazamiento */
