@@ -54,13 +54,13 @@ function Lista<T>({ items, vacio = "Sin registros.", fila }: { items: T[]; vacio
     ? <ul className="mt-3 divide-y divide-line">{items.map((x, i) => <li key={i} className="py-2.5 first:pt-0 last:pb-0">{fila(x)}</li>)}</ul>
     : <p className="mt-3 text-sm text-muted">{vacio}</p>;
 }
-function Origenes({ fuentes, conFecha }: { fuentes: Fuente[]; conFecha?: boolean }) {
+function Origenes({ fuentes, prefijo }: { fuentes: Fuente[]; prefijo?: string }) {
   return (
     <span className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
       {fuentes.map((f) => (
         <span key={f.clave} className="inline-flex items-center gap-2 text-[0.82rem] text-muted" title={f.lugar}>
           <Chip clave={f.clave} />
-          {conFecha && f.fecha ? <>desde {fecha(f.fecha)}</> : <span className="hidden sm:inline">{f.lugar}</span>}
+          {prefijo && f.fecha ? <>{prefijo} {fecha(f.fecha)}</> : <span className="hidden sm:inline">{f.lugar}</span>}
         </span>
       ))}
     </span>
@@ -184,13 +184,13 @@ export function ResultadoResumen({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <section className={panel}><h2 className="text-lg font-semibold">Medicamentos</h2>
-          <p className="mt-1 text-[0.82rem] text-muted">Tratamiento registrado en cada sistema y desde cuándo.</p>
-          <Lista items={r.medicamentos} fila={(m) => <><span className="font-medium">{m.nombre}</span><Origenes fuentes={m.fuentes} conFecha /></>} /></section>
+          <p className="mt-1 text-[0.82rem] text-muted">Tratamiento indicado según cada sistema y fecha de la receta.</p>
+          <Lista items={r.medicamentos} fila={(m) => <><span className="font-medium">{m.nombre}</span><Origenes fuentes={m.fuentes} prefijo="recetado el" /></>} /></section>
         <section className={panel}><h2 className="text-lg font-semibold">Alergias</h2>
           <Lista items={r.alergias} fila={(a) => <><span className="block font-semibold text-danger">{a.sustancia}</span>{a.reaccion}<Origenes fuentes={a.fuentes} /></>} /></section>
       </div>
       <section className={panel}><h2 className="text-lg font-semibold">Condiciones</h2>
-        <Lista items={r.condiciones} fila={(c) => <>{c.nombre}<Sub>CIE-10 {c.codigo}</Sub><Origenes fuentes={c.fuentes} /></>} /></section>
+        <Lista items={r.condiciones} fila={(c) => <>{c.nombre}<Sub>CIE-10 {c.codigo}</Sub><Origenes fuentes={c.fuentes} prefijo="desde" /></>} /></section>
 
       <section className={panel}>
         <details className="group">

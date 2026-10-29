@@ -108,6 +108,8 @@ const fhir = {
     clinicalStatus: { coding: [{ system: "http://terminology.hl7.org/CodeSystem/condition-clinical", code: "active" }] },
     code: { coding: [{ system: "http://hl7.org/fhir/sid/icd-10", code: cie10, display: texto }], text: texto },
     subject: ref(pid), recorder: { display: org },
+    // Fecha del diagnóstico: determinista por paciente y código, entre 5 meses y 4 años atrás.
+    recordedDate: haceDias(150 + ([...(pid + cie10)].reduce((a, c) => a + c.charCodeAt(0), 0) % 1300)),
   }),
 };
 

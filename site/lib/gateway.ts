@@ -234,7 +234,7 @@ async function consultarHistorial(dni: string, medico = MEDICO.nombre, motivo = 
     for (const c of r.Condition) {
       const k: string = c.code.coding[0].code;
       if (!condiciones.has(k)) condiciones.set(k, { codigo: k, nombre: c.code.text, fuentes: [] });
-      condiciones.get(k)!.fuentes.push({ clave, lugar: est });
+      condiciones.get(k)!.fuentes.push({ clave, lugar: est, fecha: c.recordedDate?.slice(0, 10) });
     }
   }
   examenes.sort((a, b) => b.fecha.localeCompare(a.fecha));
