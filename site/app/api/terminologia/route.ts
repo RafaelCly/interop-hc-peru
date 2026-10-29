@@ -1,9 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { CATALOGO } from "@/lib/data";
+import { EXAMENES } from "@/lib/catalogo-clinico";
 
+// GET /api/terminologia            (todo el catálogo clínico)
 // GET /api/terminologia?codigos=2093-3,718-7
 // Consulta el servicio de terminología de HL7 (tx.fhir.org) para obtener el nombre oficial de cada
-// código LOINC. Solo acepta códigos del catálogo del visor, de modo que no funciona como proxy abierto.
+// código LOINC. Solo acepta códigos del catálogo clínico del portal, de modo que no funciona como proxy abierto.
 const TX = "https://tx.fhir.org/r4/CodeSystem/$lookup";
 
 async function nombreOficial(codigo: string): Promise<{ display: string; version: string | null } | null> {
@@ -21,16 +22,19 @@ async function nombreOficial(codigo: string): Promise<{ display: string; version
 }
 
 export async function GET(req: NextRequest) {
-  const pedidos = (req.nextUrl.searchParams.get("codigos") ?? "")
-    .split(",")
+  const parametro = req.nextUrl.searchParams.get("codigos");
+  const pedidos = (parametro ? parametro.split(",") : Object.keys(EXAMENES))
     .map((c) => c.trim())
-    .filter((c) => c in CATALOGO);
-  const codigos = [...new Set(pedidos)].slice(0, 20);
+    .filter((c) => c in EXAMENES);
+  const codigos = [...new Set(pedidos)].slice(0, 30);
   const respuestas = await Promise.all(codigos.map(async (c) => [c, await nombreOficial(c)] as const));
   const items: Record<string, string> = {};
   let version: string | null = null;
   for (const [c, r] of respuestas) {
-    if (r) { items[c] = r.display; version ??= r.version; }
+    if (r) {
+      items[c] = r.display;
+      version ??= r.version;
+    }
   }
   return NextResponse.json(
     { fuente: "tx.fhir.org", version, items },

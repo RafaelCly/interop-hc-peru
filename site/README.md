@@ -1,36 +1,31 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# interop-hc-peru · sitio
 
-## Getting Started
+Aplicación Next.js 16 (App Router) con TypeScript, Tailwind v4, Motion, Phosphor y Geist. Es lo que se despliega en
+Vercel (Root Directory `site`).
 
-First, run the development server:
+## Comandos
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm ci            # instalar dependencias
+npm run dev       # desarrollo en http://localhost:3000
+npm run build     # compilación de producción
+npm run start     # servir la compilación
+npm run test:sjl  # pruebas del dataset sintético
+npm run test:v2   # pruebas del servidor del portal
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Qué contiene
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `/` portada con una vista previa armada en el servidor.
+- `/ingresar`, `/medico` y `/paciente`: portales con sesión y rol (ver [`../docs/portal-sjl.md`](../docs/portal-sjl.md)).
+- `/api/portal/[accion]`: API del portal, con autorización en el servidor.
+- `/api/terminologia`: nombres oficiales de LOINC, consultados a `tx.fhir.org`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Variables de entorno (opcionales)
 
-## Learn More
+| Variable | Para qué |
+|---|---|
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` (o `KV_REST_API_URL`, `KV_REST_API_TOKEN`) | Guardar el estado del portal en Redis, compartido entre instancias. Sin ellas, el estado vive en memoria en Vercel y en un archivo en local. |
+| `DEMO_STATE_DIR` | Carpeta del archivo de estado en local. Por defecto `.demo-state`. |
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Todos los datos son ficticios. No ingresar información personal real.

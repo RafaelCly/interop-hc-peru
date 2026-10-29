@@ -1,9 +1,6 @@
-import type { Metadata } from "next";
-import { Visor } from "@/components/visor/visor";
-
-export const metadata: Metadata = { title: "Visor" };
-
-export default async function PaginaVisor({ params }: { params: Promise<{ dni?: string[] }> }) {
-  const { dni } = await params;
-  return <Visor dni={dni?.[0]} />;
+import { redirect } from "next/navigation";
+import { session } from "@/lib/server/auth";
+export default async function LegacyVisor() {
+  const u = await session();
+  redirect(u ? (u.role === "medico" ? "/medico" : "/paciente") : "/ingresar");
 }

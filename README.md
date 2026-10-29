@@ -1,76 +1,87 @@
 # interop-hc-peru
 
-**PMV1 · Visor de historia clínica unificada**
+**Visor de historia clínica unificada, con portales de médico y paciente**
 Curso TE111U Innovación y Gestión Tecnológica (UNI-FIIS) · Grupo C
 
-Prototipo que simula la **interoperabilidad de la historia clínica en el Perú**: un paciente atendido en el
-Minsa, en EsSalud y en una clínica privada tiene tres historiales aislados. El visor los unifica a partir del DNI,
-avisa al médico si un examen ya se hizo en otro establecimiento y respeta el consentimiento del paciente.
+Prototipo que simula la **interoperabilidad de la historia clínica en el Perú**. Un paciente atendido en el Minsa, en
+EsSalud y en una clínica privada tiene tres historiales aislados. El prototipo los unifica a partir del DNI, avisa si
+un examen ya se hizo en otro establecimiento y deja el control en manos del paciente: el médico **solicita** acceso, el
+paciente **autoriza o revoca**, y cada consulta queda registrada.
 
-> **Todos los datos son ficticios.** Los pacientes (DNI 90000001 en adelante) y los sistemas son simulados.
-> Las historias clínicas reales son datos sensibles protegidos por la Ley N.° 29733 y no se usan.
+> **Todos los datos son ficticios.** Los pacientes (DNI 90000001 a 90000024), los médicos, los sistemas y las sedes de
+> San Juan de Lurigancho son simulados. Las historias clínicas reales son datos sensibles protegidos por la
+> Ley N.° 29733 y no se usan. No ingresar información personal real.
 
 ## El problema y la solución
 
-- **Problema:** al atenderse en más de un establecimiento, los antecedentes no viajan con el paciente: el médico
-  los reconstruye de memoria o repite exámenes, y el paciente carga sus propios resultados.
-- **Solución elegida (terna de soluciones, mayor puntaje):** visor de resumen del paciente sobre FHIR con alerta de
-  exámenes duplicados. El carné con consentimiento del paciente se integra como módulo del visor.
+- **Problema:** al atenderse en más de un establecimiento, los antecedentes no viajan con el paciente: el médico los
+  reconstruye de memoria o repite exámenes, y el paciente carga sus propios resultados.
+- **Solución elegida:** visor de resumen del paciente sobre FHIR, con autorización del paciente, trazabilidad de
+  accesos y alerta de exámenes similares entre establecimientos.
 
-## Qué hace el PMV1
+## Qué hace
 
 | Función | Dónde |
 |---|---|
-| Tres sistemas simulados (Minsa · SIHCE, EsSalud · ESSI, Clínica privada), cada uno con su API FHIR R4 y sus propios IDs | `app/systems.py` |
-| Capa de interoperabilidad: consulta los tres sistemas por HTTP, normaliza y unifica por DNI | `app/gateway.py` |
-| Normalización de códigos: la clínica usa códigos propios que se traducen a LOINC | `app/config.py`, `app/gateway.py` |
-| Unificación de medicamentos, alergias y condiciones, con el establecimiento de origen | `app/gateway.py` |
-| Alerta de exámenes repetidos entre establecimientos y evaluación al **pedir** un examen | `app/alerts.py` |
-| Consentimiento del paciente y registro de quién consultó el historial | `app/consent.py` |
-| Tolerancia a fallos: si un sistema cae, el visor avisa que el historial está incompleto | `app/gateway.py`, interfaz |
-| Visor web para el médico | `app/static/` |
+| Portal del médico: solicita acceso por DNI y finalidad, y consulta solo lo autorizado | `site/components/portal/medico.tsx` |
+| Portal del paciente: autoriza por 1 hora, 24 horas o 7 días, revoca y ve quién accedió | `site/components/portal/paciente.tsx` |
+| Ingreso con rol, contraseñas con scrypt, sesiones revocables y límite de intentos | `site/lib/server/auth.ts` |
+| Historial por atención con filtros, tratamientos, informes imprimibles y alergias destacadas | `site/components/portal/historia.tsx` |
+| Tres sistemas simulados (Minsa, EsSalud, clínica) con recursos FHIR R4 y códigos locales normalizados a LOINC | `site/lib/data.ts`, `site/lib/server/clinical.ts` |
+| Coincidencias de exámenes entre establecimientos, con aviso de que son orientativas | `site/lib/server/clinical.ts` |
+| Tolerancia a fallos: si una fuente cae, el historial se marca como incompleto | `site/lib/server/clinical.ts` |
+| Nombres oficiales de LOINC consultados en vivo a `tx.fhir.org` | `site/app/api/terminologia/route.ts` |
 
-## Arquitectura
-
-```mermaid
-flowchart LR
-    V[Visor web<br/>médico] -->|/api| G[Gateway de<br/>interoperabilidad]
-    G -->|FHIR R4| M[Minsa · SIHCE<br/>simulado]
-    G -->|FHIR R4| E[EsSalud · ESSI<br/>simulado]
-    G -->|FHIR R4 + códigos locales| C[Clínica privada<br/>simulada]
-    G --> K[Consentimiento y<br/>registro de accesos]
-```
-
-Los sistemas simulados viven en el mismo proceso, pero el gateway **no accede a sus datos directamente**: los consulta
-mediante peticiones HTTP/FHIR (`/sistemas/{minsa|essalud|clinica}/fhir/...`), igual que lo haría con sistemas reales.
-Esos endpoints también se pueden abrir en el navegador, por ejemplo `/sistemas/minsa/fhir/metadata`.
+Manual completo, usuarios de prueba y recorrido: [`docs/portal-sjl.md`](docs/portal-sjl.md).
 
 ## Cómo ejecutarlo
 
-### Sitio principal (carpeta `site/`, Next.js)
-
-Next.js 16 (App Router) con TypeScript, Tailwind v4, Motion, Phosphor y Geist. Los tres sistemas FHIR simulados se sirven como Route Handlers en `/api/fhir/{minsa|essalud|clinica}/{recurso}`; la pasarela del navegador los consulta en paralelo, traduce códigos locales a LOINC, une por DNI y aplica consentimiento y alertas. Se despliega en Vercel con Root Directory `site`.
+Requiere Node.js 22 o superior.
 
 ```bash
 cd site
-npm install
+npm ci
 npm run dev
 ```
 
-Abrir <http://localhost:3000>.
+Abrir <http://localhost:3000/ingresar>. Para entrar:
 
-### Versión estática de respaldo (carpeta `web/`)
+| Perfil | Identificador | Correo | Contraseña |
+|---|---|---|---|
+| Médica | CMP-DEMO-001 | `medico.demo@sjl.test` | `DemoMedico2026!` |
+| Paciente | DNI 90000001 | `paciente01@demo.sjl.test` | `DemoPaciente2026!` |
 
-HTML, CSS y JavaScript nativo, sin build ni backend. Mismo comportamiento con todo en el navegador. Se despliega con Root Directory `web`, Framework Preset "Other" y sin build command.
+Pruebas automáticas:
 
 ```bash
-cd web
-python -m http.server 8080
+npm run test:sjl   # dataset sintético
+npm run test:v2    # permisos, sesiones, revocación y auditoría
+npm run build
 ```
 
-Abrir <http://localhost:8080>.
+## Despliegue en Vercel
 
-### Backend (FastAPI)
+1. Importar el repositorio y elegir **Root Directory: `site`**. Framework: Next.js.
+2. Opcional, pero recomendado para el flujo médico y paciente: conectar una base **Redis** (Upstash, desde el
+   Marketplace de Vercel, plan gratuito). Con ella, cuentas, sesiones y autorizaciones se comparten entre instancias.
+   Sin Redis, el estado vive en la memoria de la instancia y puede reiniciarse.
+
+Detalle de los modos de almacenamiento en [`docs/portal-sjl.md`](docs/portal-sjl.md).
+
+## Estructura
+
+```
+site/        aplicación Next.js: portada, portales, API y pruebas (lo que se despliega)
+docs/        manual del portal, plan maestro y notas de la primera entrega de SJL
+app/         primera versión del backend en FastAPI (PMV1), con sus pruebas en tests/
+web/         primera versión estática del visor (PMV1), de respaldo
+scripts/     validación del prototipo contra servicios públicos (HAPI y tx.fhir.org)
+```
+
+`app/` y `web/` son la primera versión del prototipo. Se conservan por historia: **no incluyen el acceso por roles**
+y no se usan en la demostración.
+
+## Versión anterior en FastAPI (PMV1)
 
 Requiere Python 3.11 o superior.
 
@@ -79,28 +90,10 @@ python -m venv .venv
 # Windows: .venv\Scripts\activate    ·    Linux/macOS: source .venv/bin/activate
 pip install -r requirements.txt
 python -m uvicorn app.main:app --reload
-```
-
-Abrir <http://localhost:8000>. La documentación interactiva de la API está en <http://localhost:8000/docs>.
-
-Pruebas automáticas:
-
-```bash
 python -m pytest
 ```
 
-## Guion de demostración
-
-| DNI | Qué muestra |
-|---|---|
-| `90000001` | Paciente en Minsa y EsSalud con **HbA1c y glucosa repetidas**; la alergia solo está registrada en un sistema |
-| `90000002` | **ECG repetido** entre Minsa y clínica; pedir un ECG dispara la alerta de duplicado |
-| `90000003` | Referencia del Minsa a EsSalud: radiografía de tórax y hemoglobina repetidas |
-| `90000004` | Caso de control: un solo sistema, sin duplicados |
-| `90000005` | Tres sistemas y **sin consentimiento**: el acceso se bloquea hasta que el paciente autoriza |
-| `90000006` | La clínica envía los exámenes con **códigos locales** y el gateway los normaliza a LOINC |
-
-Para ver la tolerancia a fallos, haga clic en el nombre de un sistema en la cabecera para simular su caída.
+Abrir <http://localhost:8000>. La documentación interactiva de la API está en <http://localhost:8000/docs>.
 
 ## Validación con servicios externos
 
@@ -111,39 +104,23 @@ python scripts/validar_fhir.py      # valida los recursos contra el servidor FHI
 python scripts/verificar_loinc.py   # comprueba los códigos LOINC contra un servidor de terminología (tx.fhir.org)
 ```
 
-- Solo se envían datos ficticios. Son servidores públicos de prueba y pueden cambiar o limitar el uso, por lo que
-  no se consumen desde la aplicación en ejecución.
+- Solo se envían datos ficticios. Son servidores públicos de prueba y pueden cambiar o limitar el uso.
 - El servidor HAPI público no incluye los CodeSystem de LOINC ni de CIE-10, así que esos códigos se verifican con el
   servidor de terminología.
+- Los 21 códigos del catálogo clínico del portal se comprobaron contra `tx.fhir.org`; todos son válidos.
 
-## Estructura
+## Alcance y limitaciones
 
-```
-app/
-  main.py        API del visor y arranque
-  gateway.py     capa de interoperabilidad
-  systems.py     sistemas simulados (API FHIR)
-  synthetic.py   generador de pacientes ficticios
-  alerts.py      detección de duplicados
-  consent.py     consentimiento y accesos
-  fhir.py        constructores de recursos FHIR
-  config.py      catálogo de exámenes y códigos
-  static/        interfaz web
-tests/           pruebas automáticas
-```
-
-## Alcance y limitaciones del PMV1
-
-- Usa recursos FHIR R4 básicos (`Patient`, `Observation`, `DiagnosticReport`, `MedicationStatement`,
-  `AllergyIntolerance`, `Condition`). **Aún no se valida contra el perfil `HL7.FHIR.PE.COREPE` del Minsa.**
+- Usa recursos FHIR R4 básicos. **Aún no se valida contra el perfil `HL7.FHIR.PE.COREPE` del Minsa.**
 - El URI del DNI (`https://www.reniec.gob.pe/dni`) es de ejemplo.
-- Las ventanas de días para considerar duplicado un examen son parámetros de demostración, no criterios clínicos.
-- Autenticación y autorización reales no están implementadas: el consentimiento y el médico son simulados.
-- Los datos viven en memoria y se regeneran al iniciar; las fechas son relativas al día de ejecución.
+- La verificación del CMP y la identidad del paciente son simuladas. No hay MFA ni recuperación de cuenta.
+- Las coincidencias de exámenes son orientativas, no criterios clínicos de repetición.
+- Los rangos de referencia son docentes y no reemplazan los del laboratorio que emite cada informe.
+- El estado del portal se guarda en un archivo (local), en memoria (Vercel) o en Redis (opcional).
 
-## Próximos pasos (PMV2)
+## Próximos pasos
 
-1. Validar los recursos contra el perfil peruano de FHIR del Minsa.
-2. Carné digital del paciente con QR y consentimiento por establecimiento.
-3. Modo sin conexión con sincronización diferida para establecimientos con poca conectividad.
+1. Backend propio y base de datos transaccional para consentimientos y accesos.
+2. Validar los recursos contra el perfil peruano de FHIR del Minsa.
+3. Sumar un servidor FHIR público de pruebas como cuarto sistema.
 4. Validar el flujo con un médico y con pacientes reales (entrevistas de usabilidad).

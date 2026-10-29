@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Base local con sesiones y accesos ficticios (nunca subir a Git)
+.demo-state/

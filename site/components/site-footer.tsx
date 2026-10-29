@@ -8,8 +8,7 @@ const columnas = [
   {
     titulo: "Producto",
     enlaces: [
-      { href: "/visor", texto: "Visor de historia clínica" },
-      { href: "/visor/90000001", texto: "Ver un caso" },
+      { href: "/ingresar", texto: "Portal del médico y del paciente" },
       { href: "/#como-funciona", texto: "Cómo funciona" },
     ],
   },
@@ -28,7 +27,10 @@ export function SiteFooter() {
     <footer className="mt-8 border-t border-line">
       <div className={`${contenedor} grid gap-8 py-8 sm:grid-cols-[1.4fr_1fr_1fr]`}>
         <div>
-          <Link href="/" className="font-mono text-[0.95rem] font-medium tracking-tight text-ink no-underline">
+          <Link
+            href="/"
+            className="font-mono text-[0.95rem] font-medium tracking-tight text-ink no-underline"
+          >
             interop<span className="text-accent-strong">-hc-</span>peru
           </Link>
           <p className="mt-3 max-w-[32ch] text-[0.95rem] text-muted">
@@ -42,9 +44,20 @@ export function SiteFooter() {
               {c.enlaces.map((e) => (
                 <li key={e.texto}>
                   {"externo" in e ? (
-                    <a href={e.href} rel="noopener" className="text-ink underline-offset-4 hover:text-accent-strong hover:underline">{e.texto}</a>
+                    <a
+                      href={e.href}
+                      rel="noopener"
+                      className="text-ink underline-offset-4 hover:text-accent-strong hover:underline"
+                    >
+                      {e.texto}
+                    </a>
                   ) : (
-                    <Link href={e.href} className="text-ink underline-offset-4 hover:text-accent-strong hover:underline">{e.texto}</Link>
+                    <Link
+                      href={e.href}
+                      className="text-ink underline-offset-4 hover:text-accent-strong hover:underline"
+                    >
+                      {e.texto}
+                    </Link>
                   )}
                 </li>
               ))}
@@ -53,7 +66,9 @@ export function SiteFooter() {
         ))}
       </div>
       <div className="border-t border-line">
-        <div className={`${contenedor} flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-5 text-[0.82rem] text-muted`}>
+        <div
+          className={`${contenedor} flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-5 text-[0.82rem] text-muted`}
+        >
           <p>© 2026 interop-hc-peru</p>
           <p>Versión de demostración. Los pacientes y sus registros son ficticios.</p>
         </div>

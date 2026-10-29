@@ -1,4 +1,4 @@
-import type { Alerta } from "@/lib/gateway";
+import type { Alerta } from "@/lib/tipos";
 
 export const mensajeAlerta = (a: Alerta) =>
   `${a.examen}: se repitió en ${a.lugarRepeticion} ${a.dias} días después de ${a.lugarAnterior} (ventana de ${a.ventana} días).`;

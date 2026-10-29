@@ -8,7 +8,7 @@ import { contenedor } from "./ui";
 
 const enlaces = [
   { href: "/", texto: "Inicio" },
-  { href: "/visor", texto: "Visor" },
+  { href: "/ingresar", texto: "Acceder" },
 ];
 
 function BotonTema() {
@@ -20,7 +20,11 @@ function BotonTema() {
   const alternar = () => {
     const siguiente = oscuro ? "light" : "dark";
     document.documentElement.dataset.theme = siguiente;
-    try { localStorage.setItem("tema", siguiente); } catch { /* ignorar */ }
+    try {
+      localStorage.setItem("tema", siguiente);
+    } catch {
+      /* ignorar */
+    }
     setOscuro(!oscuro);
   };
   return (
@@ -40,7 +44,10 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-bg">
       <div className={`${contenedor} flex min-h-16 items-center justify-between gap-4`}>
-        <Link href="/" className="whitespace-nowrap font-mono text-[0.95rem] font-medium tracking-tight text-ink no-underline">
+        <Link
+          href="/"
+          className="whitespace-nowrap font-mono text-[0.95rem] font-medium tracking-tight text-ink no-underline"
+        >
           interop<span className="text-accent-strong">-hc-</span>peru
         </Link>
         <nav aria-label="Principal" className="flex items-center gap-1">
