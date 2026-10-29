@@ -62,9 +62,10 @@ npm run build
 ## Despliegue en Vercel
 
 1. Importar el repositorio y elegir **Root Directory: `site`**. Framework: Next.js.
-2. Opcional, pero recomendado para el flujo médico y paciente: conectar una base **Redis** (Upstash, desde el
-   Marketplace de Vercel, plan gratuito). Con ella, cuentas, sesiones y autorizaciones se comparten entre instancias.
-   Sin Redis, el estado vive en la memoria de la instancia y puede reiniciarse.
+2. **Obligatorio para el portal:** conectar una base **Redis** (Upstash, desde Storage > Marketplace en Vercel, plan
+   gratuito) a los entornos Production y Preview, y volver a desplegar. En Vercel cada ruta corre como una función
+   distinta, sin memoria compartida: sin una base común, la sesión creada al ingresar no la vería la página
+   siguiente. Sin Redis, el ingreso muestra un aviso y el portal no arranca.
 
 Detalle de los modos de almacenamiento en [`docs/portal-sjl.md`](docs/portal-sjl.md).
 
@@ -116,7 +117,7 @@ python scripts/verificar_loinc.py   # comprueba los códigos LOINC contra un ser
 - La verificación del CMP y la identidad del paciente son simuladas. No hay MFA ni recuperación de cuenta.
 - Las coincidencias de exámenes son orientativas, no criterios clínicos de repetición.
 - Los rangos de referencia son docentes y no reemplazan los del laboratorio que emite cada informe.
-- El estado del portal se guarda en un archivo (local), en memoria (Vercel) o en Redis (opcional).
+- El estado del portal (cuentas, sesiones, autorizaciones y bitácora) vive en un archivo en local y en Redis en Vercel.
 
 ## Próximos pasos
 

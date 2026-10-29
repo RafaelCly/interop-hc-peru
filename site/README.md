@@ -21,11 +21,11 @@ npm run test:v2   # pruebas del servidor del portal
 - `/api/portal/[accion]`: API del portal, con autorización en el servidor.
 - `/api/terminologia`: nombres oficiales de LOINC, consultados a `tx.fhir.org`.
 
-## Variables de entorno (opcionales)
+## Variables de entorno
 
 | Variable | Para qué |
 |---|---|
-| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` (o `KV_REST_API_URL`, `KV_REST_API_TOKEN`) | Guardar el estado del portal en Redis, compartido entre instancias. Sin ellas, el estado vive en memoria en Vercel y en un archivo en local. |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` (o `KV_REST_API_URL`, `KV_REST_API_TOKEN`) | **Obligatorias en Vercel.** Guardan el estado del portal en Redis. Se crean solas al conectar Upstash al proyecto. En local son opcionales: sin ellas se usa un archivo. |
 | `DEMO_STATE_DIR` | Carpeta del archivo de estado en local. Por defecto `.demo-state`. |
 
 Todos los datos son ficticios. No ingresar información personal real.

@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:sjl": "node tests-smoke-sjl.cjs",
-    "test:v2": "node tests-v2.cjs"
+    "test:v2": "node tests-v2.cjs && node tests-almacen.cjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

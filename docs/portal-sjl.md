@@ -75,19 +75,22 @@ Cuentas, sesiones, solicitudes y bitácora se guardan como un único documento J
 | Modo | Cuándo se usa | Características |
 |---|---|---|
 | Archivo | Desarrollo local | `site/.demo-state/portal.json`, excluido de Git |
-| Memoria | En Vercel, sin Redis | Vive mientras la instancia siga activa; puede reiniciarse y perder sesiones y autorizaciones |
-| Redis | Si existen `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN` (o `KV_REST_API_URL` y `KV_REST_API_TOKEN`) | Compartido entre instancias; el estado sobrevive a reinicios |
+| Redis | Si existen `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN` (o `KV_REST_API_URL` y `KV_REST_API_TOKEN`) | Base compartida; el estado sobrevive a reinicios |
+| Sin almacén | En Vercel sin Redis | El portal no arranca: el ingreso muestra un aviso y la API responde 503 con la causa |
 
-Para que el flujo entre médico y paciente sea estable en Vercel, conviene conectar una base Redis (por ejemplo,
-Upstash desde el Marketplace de Vercel, plan gratuito). Las variables se crean solas al conectarla al proyecto.
+**En Vercel, Redis es obligatorio.** Cada ruta corre como una función distinta, sin memoria ni disco compartidos. Si el
+estado viviera en memoria, la sesión creada por `/api/portal/login` no sería visible para la página `/medico`, que
+corre en otra función, y el ingreso parecería no hacer nada. Por eso, sin Redis, el portal avisa en lugar de simular.
 
+Para conectarlo: en el proyecto de Vercel, **Storage > Marketplace > Upstash Redis** (plan gratuito), conectarlo a los
+entornos **Production y Preview** y volver a desplegar. Las variables se crean solas.
 ## Limitaciones respecto del plan maestro
 
 | Tema | Situación actual | Para un piloto real |
 |---|---|---|
 | CMP y habilitación del médico | Campo CMP-DEMO y profesionales ficticios preaprovisionados; **no** se consulta el CMP | Validación oficial autorizada, vínculo laboral y recertificación |
 | Identidad del paciente | Cuentas sintéticas preaprovisionadas con DNI, correo y contraseña | Acreditación oficial, verificación de contacto, recuperación de cuenta, MFA y representación legal |
-| Persistencia | Un documento JSON (archivo, memoria o Redis) | PostgreSQL transaccional, concurrencia, copias de seguridad, registros inmutables y gestión de llaves |
+| Persistencia | Un documento JSON (archivo local o Redis) | PostgreSQL transaccional, concurrencia, copias de seguridad, registros inmutables y gestión de llaves |
 | Autenticación | Hash scrypt y sesiones HttpOnly; **sin** MFA ni recuperación de cuenta | MFA, rotación de secretos, política de riesgo y proveedor de identidad |
 | Integraciones | Tres redes de datos ficticios generadas en la misma aplicación | APIs autorizadas, autenticación mutua, interoperabilidad con IPS y COREPE y pruebas de conformidad |
 | Informes | Tablas sintetizadas con formato imprimible | Documentos originales firmados, estados, revisión y paneles multiparámetro reales |
@@ -104,7 +107,7 @@ site/app/medico/, site/app/paciente/ portales, con sesión y rol verificados
 site/app/api/portal/[accion]/        API del portal, con autorización en el servidor
 site/app/api/terminologia/           nombres oficiales de LOINC (tx.fhir.org)
 site/lib/server/auth.ts              cuentas, sesiones, autorizaciones y auditoría
-site/lib/server/almacen.ts           dónde se guarda el estado (archivo, memoria o Redis)
+site/lib/server/almacen.ts           dónde se guarda el estado (archivo local o Redis)
 site/lib/server/clinical.ts          resumen clínico a partir de las fuentes FHIR ficticias
 site/lib/data.ts                     dataset sintético y recursos FHIR
 site/lib/catalogo-clinico.ts         21 exámenes, unidades, muestras y referencias
@@ -119,7 +122,7 @@ site/tests-smoke-sjl.cjs             pruebas del dataset
 ```bash
 cd site
 npm run test:sjl   # dataset: pacientes, sedes, exámenes, atenciones y resultados
-npm run test:v2    # servidor: login, aislamiento, permisos, revocación, auditoría y caída parcial
+npm run test:v2    # servidor: login, aislamiento, permisos, revocación, auditoría, caída parcial y almacén
 npm run build
 ```
 

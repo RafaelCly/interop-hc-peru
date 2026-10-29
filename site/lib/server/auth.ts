@@ -2,7 +2,7 @@ import "server-only";
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { PACIENTES } from "@/lib/fhir-server";
-import { guardarEstado, leerEstado } from "./almacen";
+import { ErrorAlmacen, guardarEstado, leerEstado } from "./almacen";
 
 export type Role = "medico" | "paciente";
 export interface DemoUser {
@@ -187,9 +187,14 @@ export function addEvent(
 export async function session(): Promise<DemoUser | null> {
   const token = (await cookies()).get(KEY)?.value;
   if (!token || !/^[a-f0-9]{64}$/.test(token)) return null;
-  const s = await readState();
-  const x = s.sessions.find((x) => x.hash === hashToken(token) && x.expira > Date.now());
-  return x ? (s.users.find((u) => u.id === x.userId) ?? null) : null;
+  try {
+    const s = await readState();
+    const x = s.sessions.find((x) => x.hash === hashToken(token) && x.expira > Date.now());
+    return x ? (s.users.find((u) => u.id === x.userId) ?? null) : null;
+  } catch (e) {
+    if (e instanceof ErrorAlmacen) return null; // sin almacén no hay sesión; el ingreso explica el motivo
+    throw e;
+  }
 }
 export async function setSession(token: string) {
   (await cookies()).set(KEY, token, {

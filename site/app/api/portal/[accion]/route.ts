@@ -15,6 +15,7 @@ import {
   checkOrigin,
 } from "@/lib/server/auth";
 import { clinicalSummary, catalogoExamenes } from "@/lib/server/clinical";
+import { ErrorAlmacen } from "@/lib/server/almacen";
 import type { Clave } from "@/lib/data";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,7 +28,18 @@ const denied = () => response({ error: "No autorizado." }, 401);
 const forbidden = () => response({ error: "Acceso no permitido." }, 403);
 const bad = (message: string) => response({ error: message }, 400);
 const getAction = async (c: { params: Promise<{ accion: string }> }) => (await c.params).accion;
-export async function GET(req: NextRequest, c: { params: Promise<{ accion: string }> }) {
+type Contexto = { params: Promise<{ accion: string }> };
+const sinAlmacen = (e: unknown) => {
+  if (e instanceof ErrorAlmacen) return response({ error: e.message }, 503);
+  throw e;
+};
+export async function GET(req: NextRequest, c: Contexto) {
+  return manejarGet(req, c).catch(sinAlmacen);
+}
+export async function POST(req: NextRequest, c: Contexto) {
+  return manejarPost(req, c).catch(sinAlmacen);
+}
+async function manejarGet(req: NextRequest, c: Contexto) {
   const action = await getAction(c);
   const u = await session();
   if (!u) return denied();
@@ -57,7 +69,7 @@ export async function GET(req: NextRequest, c: { params: Promise<{ accion: strin
   }
   return response({ error: "No encontrado." }, 404);
 }
-export async function POST(req: NextRequest, c: { params: Promise<{ accion: string }> }) {
+async function manejarPost(req: NextRequest, c: Contexto) {
   if (!checkOrigin(req)) return forbidden();
   const action = await getAction(c);
   const body = await req.json().catch(() => null);
@@ -112,6 +124,7 @@ export async function POST(req: NextRequest, c: { params: Promise<{ accion: stri
     }
     return response({ error: "No encontrado." }, 404);
   } catch (e) {
+    if (e instanceof ErrorAlmacen) throw e;
     return bad((e as Error).message);
   }
 }

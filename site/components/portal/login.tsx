@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { fetchPortal, ErrorBlock } from "./shared";
 import { btn, contenedor, panel } from "@/components/ui";
 type Role = "medico" | "paciente";
-export function LoginForm() {
+export function LoginForm({ almacenListo = true }: { almacenListo?: boolean }) {
   const router = useRouter(),
     [role, setRole] = useState<Role>("medico"),
     [correo, setCorreo] = useState("medico.demo@sjl.test"),
@@ -124,8 +124,18 @@ export function LoginForm() {
               className="min-h-12 rounded-ctl border border-line bg-bg px-3 font-normal"
             />
           </label>
+          {!almacenListo && (
+            <div
+              role="alert"
+              className="rounded-ctl border border-warn-line bg-warn-bg px-4 py-3 text-sm text-ink"
+            >
+              <strong>Falta configurar el almacén.</strong> En Vercel el portal necesita una base Redis para
+              guardar sesiones y autorizaciones. Conecta Upstash Redis al proyecto (Storage, Marketplace) y
+              vuelve a desplegar.
+            </div>
+          )}
           {error && <ErrorBlock mensaje={error} />}
-          <button className={`${btn.primary} mt-1 w-full`} type="submit" disabled={loading}>
+          <button className={`${btn.primary} mt-1 w-full`} type="submit" disabled={loading || !almacenListo}>
             {loading ? "Verificando..." : "Acceder al portal"}
           </button>
         </form>
