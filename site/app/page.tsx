@@ -5,6 +5,7 @@ import { HeroCard } from "@/components/hero-card";
 import { Flujo } from "@/components/flujo";
 import { CountUp } from "@/components/count-up";
 import { Reveal } from "@/components/reveal";
+import { EnPantalla } from "@/components/en-pantalla";
 import { Chip, btn, contenedor } from "@/components/ui";
 
 const LINKS = {
@@ -35,7 +36,7 @@ function ListaCasos({ duplicado }: { duplicado?: boolean }) {
     <ul className={`flex gap-4 ${duplicado ? "marquee-dup" : ""}`} aria-hidden={duplicado || undefined} inert={duplicado || undefined}>
       {casos.map((c) => (
         <li key={c.dni} className="flex">
-          <article className="flex w-80 shrink-0 flex-col gap-3 rounded-card border border-line bg-surface p-5 shadow-card">
+          <article className="flex w-80 shrink-0 flex-col gap-3 rounded-card border border-line bg-surface p-5">
             <span className="font-mono text-[0.8rem] text-muted">DNI {c.dni}</span>
             <div>
               <h3 className="text-[1.05rem] font-semibold leading-snug">{c.titulo}</h3>
@@ -115,17 +116,17 @@ export default function Inicio() {
           <h2 className="text-[clamp(1.6rem,1.1rem+1.8vw,2.4rem)] font-semibold">Seis casos para probar</h2>
           <p className="mt-3 max-w-[52ch] text-muted">Cada uno muestra una situación distinta. Ábralos en el visor y compare.</p>
         </div>
-        <div className="marquee mt-10" aria-label="Casos de demostración">
+        <EnPantalla><div className="marquee mt-10" role="region" aria-label="Casos de demostración">
           <div className="marquee-track">
             <ListaCasos />
             <ListaCasos duplicado />
           </div>
-        </div>
+        </div></EnPantalla>
       </section>
 
       <Reveal as="section" className={`${contenedor} py-14 sm:py-20`}>
         <h2 id="como-funciona" className="mb-10 text-[clamp(1.6rem,1.1rem+1.8vw,2.4rem)] font-semibold">Cómo se conectan los sistemas</h2>
-        <Flujo />
+        <EnPantalla><Flujo /></EnPantalla>
       </Reveal>
 
       <Reveal as="section" className={`${contenedor} pb-6 pt-8 sm:pt-12`}>

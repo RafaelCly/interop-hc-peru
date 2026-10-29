@@ -41,4 +41,4 @@ export function BotonLink({ href, variante = "primary", pequeno, children }: {
 }
 
 export const panel = "rounded-card border border-line bg-surface p-5 shadow-card sm:p-6";
-export const contenedor = "mx-auto w-[min(100%-2.5rem,1200px)]";
+export const contenedor = "mx-auto w-[min(100%-3rem,1360px)]";

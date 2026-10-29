@@ -1,8 +1,8 @@
 import { SISTEMAS, type Clave } from "@/lib/data";
 import { Chip } from "./ui";
 
-// Diagrama: visor -> capa de interoperabilidad -> tres sistemas. Los paquetes que viajan son SMIL
-// y se ocultan con prefers-reduced-motion (ver .paquete en globals.css).
+// Diagrama: visor -> capa de interoperabilidad -> tres sistemas. El flujo es una línea punteada animada por CSS
+// solo mientras el bloque es visible y con movimiento permitido (ver .linea-flujo en globals.css).
 const ALTO = 288;
 const ys = [44, 144, 244];
 const claves = Object.keys(SISTEMAS) as Clave[];
@@ -15,9 +15,7 @@ function Abanico() {
         return (
           <g key={y}>
             <path d={d} fill="none" stroke="currentColor" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-            <circle r="3.2" className="paquete fill-accent">
-              <animateMotion dur="2.6s" begin={`${i * 0.55}s`} repeatCount="indefinite" path={d} />
-            </circle>
+            <path d={d} fill="none" className="linea-flujo" vectorEffect="non-scaling-stroke" />
           </g>
         );
       })}
@@ -30,9 +28,7 @@ function Recto({ invertido }: { invertido?: boolean }) {
   return (
     <svg viewBox="0 0 160 8" preserveAspectRatio="none" className="hidden h-2 min-w-12 flex-1 text-line lg:block" aria-hidden="true">
       <path d={d} stroke="currentColor" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-      <circle r="3" cy="4" className="paquete fill-accent">
-        <animateMotion dur="2s" repeatCount="indefinite" path={d} />
-      </circle>
+      <path d={d} className="linea-flujo" vectorEffect="non-scaling-stroke" />
     </svg>
   );
 }

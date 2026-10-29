@@ -92,12 +92,13 @@ p { text-wrap: pretty; }
 }
 
 /* Cinta de casos: se mueve sola, se pausa con el mouse o el foco y no usa barra de desplazamiento */
-.marquee { position: relative; overflow: hidden; contain: paint; }
+.marquee { position: relative; overflow: hidden; }
 .marquee::before, .marquee::after { content: ""; position: absolute; inset-block: 0; inline-size: clamp(2rem, 8vw, 7rem); z-index: 1; pointer-events: none; }
 .marquee::before { inset-inline-start: 0; background: linear-gradient(to right, var(--bg), transparent); }
 .marquee::after { inset-inline-end: 0; background: linear-gradient(to left, var(--bg), transparent); }
-.marquee-track { display: flex; gap: 1rem; width: max-content; padding-block: 0.5rem 1.25rem; will-change: transform; animation: cinta 60s linear infinite; }
-.marquee:hover .marquee-track, .marquee:focus-within .marquee-track { animation-play-state: paused; }
+.marquee-track { display: flex; gap: 1rem; width: max-content; padding-block: 0.5rem 1.25rem; will-change: transform; animation: cinta 60s linear infinite; animation-play-state: paused; }
+[data-vista="true"] .marquee-track { animation-play-state: running; }
+[data-vista="true"] .marquee:hover .marquee-track, [data-vista="true"] .marquee:focus-within .marquee-track { animation-play-state: paused; }
 @keyframes cinta { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(calc(-50% - 0.5rem), 0, 0); } }
 @media (prefers-reduced-motion: reduce) {
   .marquee::before, .marquee::after { display: none; }
@@ -106,5 +107,7 @@ p { text-wrap: pretty; }
   .marquee-dup { display: none; }
 }
 
-/* Paquetes del diagrama (SMIL): se ocultan si el usuario pide menos movimiento */
-@media (prefers-reduced-motion: reduce) { .paquete { display: none; } }
+/* Flujo del diagrama: línea punteada que avanza solo si el bloque se ve y se permite movimiento */
+.linea-flujo { fill: none; stroke: var(--accent); stroke-width: 2; stroke-dasharray: 2 8; stroke-linecap: round; }
+@media (prefers-reduced-motion: no-preference) { [data-vista="true"] .linea-flujo { animation: fluye 1s linear infinite; } }
+@keyframes fluye { to { stroke-dashoffset: -10; } }
