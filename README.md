@@ -47,6 +47,19 @@ Esos endpoints también se pueden abrir en el navegador, por ejemplo `/sistemas/
 
 ## Cómo ejecutarlo
 
+### Frontend (carpeta `web/`)
+
+Sitio estático sin build ni backend: los tres sistemas FHIR simulados, la pasarela, las alertas y el consentimiento corren en el navegador. Es la versión que se despliega en Vercel (Root Directory `web`, Framework Preset "Other", sin build command).
+
+```bash
+cd web
+python -m http.server 8080
+```
+
+Abrir <http://localhost:8080>.
+
+### Backend (FastAPI)
+
 Requiere Python 3.11 o superior.
 
 ```bash
