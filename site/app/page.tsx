@@ -7,7 +7,7 @@ import { CountUp } from "@/components/count-up";
 import { Reveal } from "@/components/reveal";
 import { EnPantalla } from "@/components/en-pantalla";
 import { Chip, btn, contenedor } from "@/components/ui";
-import { Ecg } from "@/components/ecg";
+import { EcgVivo } from "@/components/ecg-vivo";
 
 const LINKS = {
   dyer: "https://www.infobae.com/peru/2026/08/06/ministro-de-salud-luis-dyer-revela-que-archivos-del-minsa-aun-se-guardan-en-cd-estamos-en-el-ano-95/",
@@ -60,11 +60,11 @@ export default function Inicio() {
     <>
       <div className="relative isolate overflow-hidden">
         <div aria-hidden="true" className="fondo-puntos absolute inset-0 -z-20" />
-        <EnPantalla className="absolute inset-x-0 bottom-3 -z-10 h-28 overflow-hidden">
-          <Ecg className="ecg-mov block max-w-none" />
-          <div aria-hidden="true" className="absolute inset-y-0 left-0 w-[10%] bg-gradient-to-r from-bg to-transparent" />
-          <div aria-hidden="true" className="absolute inset-y-0 right-0 w-[10%] bg-gradient-to-l from-bg to-transparent" />
-        </EnPantalla>
+        <div aria-hidden="true" className="absolute inset-x-0 bottom-3 -z-10 h-28 overflow-hidden">
+          <EcgVivo className="block h-full w-full" />
+          <div className="absolute inset-y-0 left-0 w-[10%] bg-gradient-to-r from-bg to-transparent" />
+          <div className="absolute inset-y-0 right-0 w-[10%] bg-gradient-to-l from-bg to-transparent" />
+        </div>
         <section className={`${contenedor} grid items-center gap-10 py-10 sm:py-12 lg:min-h-[calc(100dvh-4rem)] lg:grid-cols-[1.1fr_0.9fr] lg:gap-20`} aria-labelledby="h-hero">
           <div>
             <p className="entrada mb-5 inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3.5 py-1.5 text-[0.82rem] font-medium text-muted">
