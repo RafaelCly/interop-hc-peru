@@ -78,15 +78,6 @@ p { text-wrap: pretty; }
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
 
-/* View Transitions entre páginas (solo con soporte y sin reduced-motion) */
-@media (prefers-reduced-motion: no-preference) {
-  @view-transition { navigation: auto; }
-  ::view-transition-old(root) { animation: 160ms var(--ease-out-expo) both vt-out; }
-  ::view-transition-new(root) { animation: 260ms var(--ease-out-expo) both vt-in; }
-}
-@keyframes vt-out { to { opacity: 0; } }
-@keyframes vt-in { from { opacity: 0; transform: translateY(6px); } }
-
 /* Esqueleto de carga */
 .sk { background: linear-gradient(100deg, var(--surface-2) 30%, color-mix(in srgb, var(--surface-2) 55%, var(--surface)) 50%, var(--surface-2) 70%); background-size: 220% 100%; border-radius: 8px; animation: sk 1.4s linear infinite; }
 @keyframes sk { to { background-position-x: -220%; } }
