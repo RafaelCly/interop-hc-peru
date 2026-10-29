@@ -47,9 +47,21 @@ Esos endpoints también se pueden abrir en el navegador, por ejemplo `/sistemas/
 
 ## Cómo ejecutarlo
 
-### Frontend (carpeta `web/`)
+### Sitio principal (carpeta `site/`, Next.js)
 
-Sitio estático sin build ni backend: los tres sistemas FHIR simulados, la pasarela, las alertas y el consentimiento corren en el navegador. Es la versión que se despliega en Vercel (Root Directory `web`, Framework Preset "Other", sin build command).
+Next.js 16 (App Router) con TypeScript, Tailwind v4, Motion, Phosphor y Geist. Los tres sistemas FHIR simulados se sirven como Route Handlers en `/api/fhir/{minsa|essalud|clinica}/{recurso}`; la pasarela del navegador los consulta en paralelo, traduce códigos locales a LOINC, une por DNI y aplica consentimiento y alertas. Se despliega en Vercel con Root Directory `site`.
+
+```bash
+cd site
+npm install
+npm run dev
+```
+
+Abrir <http://localhost:3000>.
+
+### Versión estática de respaldo (carpeta `web/`)
+
+HTML, CSS y JavaScript nativo, sin build ni backend. Mismo comportamiento con todo en el navegador. Se despliega con Root Directory `web`, Framework Preset "Other" y sin build command.
 
 ```bash
 cd web
