@@ -210,7 +210,7 @@ export function ResultadoResumen({
         <h2 className="text-lg font-semibold">Quién consultó este historial</h2>
         <Lista items={accesos} vacio="Sin accesos registrados todavía." fila={(a) => (
           <div className="flex items-start justify-between gap-4">
-            <span>{a.quien}<Sub>{a.motivo}</Sub></span>
+            <span>{a.quien}<Sub>{[a.lugar, a.motivo].filter(Boolean).join(" · ")}</Sub></span>
             <span className={`text-right ${a.resultado === "denegado" ? "font-semibold text-danger" : ""}`}>{a.resultado}<Sub>{fechaHora(a.cuando)}</Sub></span>
           </div>
         )} />

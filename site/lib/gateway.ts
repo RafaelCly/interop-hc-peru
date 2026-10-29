@@ -30,7 +30,7 @@ export interface Resumen {
 export interface Pedido {
   duplicado: boolean; examen: string; ventana: number; previo: Examen | null; dias: number | null;
 }
-export interface Acceso { cuando: string; quien: string; resultado: "permitido" | "denegado" | "consentimiento"; motivo: string }
+export interface Acceso { cuando: string; quien: string; lugar?: string; resultado: "permitido" | "denegado" | "consentimiento"; motivo: string }
 export interface Caso {
   dni: string; nombre: string; sistemas: Clave[]; consentimiento: boolean; titulo?: string; muestra?: string;
 }
@@ -128,7 +128,7 @@ export function evaluarPedido(examenes: Examen[], codigo: string): Pedido {
 }
 
 // ---------- consentimiento y accesos (persisten en el navegador) ----------
-const CLAVE = "interop-hc-peru:next";
+const CLAVE = "interop-hc-peru:v2";
 interface Estado { consentimiento: Record<string, boolean>; accesos: Record<string, Acceso[]> }
 const estadoInicial = (): Estado => ({ consentimiento: Object.fromEntries(PACIENTES.map((p) => [p.dni, p.consentimiento])), accesos: {} });
 let estado: Estado | null = null;
@@ -144,12 +144,31 @@ function leer(): Estado {
   return e;
 }
 const guardar = () => { try { localStorage.setItem(CLAVE, JSON.stringify(estado)); } catch { /* ignorar */ } };
-function registrar(dni: string, quien: string, resultado: Acceso["resultado"], motivo: string) {
+function registrar(dni: string, quien: string, resultado: Acceso["resultado"], motivo: string, lugar?: string) {
   const s = leer();
-  s.accesos[dni] = [{ cuando: new Date().toISOString(), quien, resultado, motivo }, ...(s.accesos[dni] ?? [])].slice(0, 30);
+  s.accesos[dni] = [{ cuando: new Date().toISOString(), quien, lugar, resultado, motivo }, ...(s.accesos[dni] ?? [])].slice(0, 30);
   guardar();
 }
 
+// Profesionales ficticios. El primero es quien usa el visor en esta demostración.
+const PROFESIONALES = [
+  { nombre: "Dra. Lucía Paredes Vega", lugar: SISTEMAS.essalud.establecimiento },
+  { nombre: "Dr. Carlos Medina Ríos", lugar: SISTEMAS.minsa.establecimiento },
+  { nombre: "Dr. Andrés Salazar Cruz", lugar: SISTEMAS.clinica.establecimiento },
+  { nombre: "Dra. Patricia Núñez Rojas", lugar: SISTEMAS.minsa.establecimiento },
+];
+const MEDICO = PROFESIONALES[0];
+
+// Consultas anteriores de otros establecimientos, deterministas por DNI, para que el registro no empiece vacío.
+function accesosPrevios(dni: string): Acceso[] {
+  const n = Number(dni.slice(-3));
+  const motivos = ["consulta de historial", "control de seguimiento", "revisión de resultados"];
+  return [3, 11].map((dias, i) => {
+    const p = PROFESIONALES[1 + ((n + i) % 3)];
+    const cuando = new Date(Date.now() - (dias + (n % 4)) * 86400000 - 3600000 * (9 + i * 3)).toISOString();
+    return { cuando, quien: p.nombre, lugar: p.lugar, resultado: "permitido", motivo: motivos[(n + i) % 3] };
+  });
+}
 // ---------- gateway ----------
 async function consultarSistema(clave: Clave, dni: string) {
   const t0 = ahora();
@@ -173,10 +192,10 @@ function validar(dni: string) {
   if (!(dni in leer().consentimiento)) throw new ErrorApi("no_encontrado", "No se encontró un paciente con ese DNI en los sistemas conectados.");
 }
 
-async function consultarHistorial(dni: string, medico = "Dra. de demostración", motivo = "consulta de historial", dejarRegistro = true): Promise<Resumen> {
+async function consultarHistorial(dni: string, medico = MEDICO.nombre, motivo = "consulta de historial", dejarRegistro = true): Promise<Resumen> {
   validar(dni);
   if (!leer().consentimiento[dni]) {
-    if (dejarRegistro) registrar(dni, medico, "denegado", motivo);
+    if (dejarRegistro) registrar(dni, medico, "denegado", motivo, MEDICO.lugar);
     throw new ErrorApi("sin_consentimiento", "El paciente no ha autorizado el acceso a su historial.");
   }
   const t0 = ahora();
@@ -217,7 +236,7 @@ async function consultarHistorial(dni: string, medico = "Dra. de demostración",
     }
   }
   examenes.sort((a, b) => b.fecha.localeCompare(a.fecha));
-  if (dejarRegistro) registrar(dni, medico, "permitido", motivo);
+  if (dejarRegistro) registrar(dni, medico, "permitido", motivo, MEDICO.lugar);
   return {
     dni, nombre: `${base.name[0].given.join(" ")} ${base.name[0].family}`, sexo: base.gender, edad: edad(base.birthDate),
     establecimientos: resultados
@@ -247,9 +266,9 @@ export const api = {
   consentimiento(dni: string, otorgado: boolean) {
     validar(dni);
     leer().consentimiento[dni] = otorgado;
-    registrar(dni, "Paciente (simulado)", "consentimiento", otorgado ? "otorgado" : "revocado");
+    registrar(dni, PACIENTES.find((p) => p.dni === dni)?.nombre ?? "Paciente", "consentimiento", otorgado ? "otorgado" : "revocado", "Paciente");
   },
-  accesos: (dni: string): Acceso[] => leer().accesos[dni] ?? [],
+  accesos: (dni: string): Acceso[] => [...(leer().accesos[dni] ?? []), ...accesosPrevios(dni)],
   // Nombres oficiales LOINC desde el servicio de terminología de HL7. Si falla, devuelve vacío y el visor sigue igual.
   async terminologia(): Promise<Terminologia> {
     if (terminologia) return terminologia;
@@ -264,7 +283,7 @@ export const api = {
     }
   },
   async pedirExamen(dni: string, codigo: string) {
-    const r = await consultarHistorial(dni, "Dra. de demostración", `pedido de ${CATALOGO[codigo][0]}`);
+    const r = await consultarHistorial(dni, MEDICO.nombre, `pedido de ${CATALOGO[codigo][0]}`);
     return evaluarPedido(r.examenes, codigo);
   },
 };
