@@ -17,13 +17,15 @@ export interface Alerta {
   codigo: string; examen: string; fechaAnterior: string; lugarAnterior: string; sistemaAnterior: Clave;
   fechaRepeticion: string; lugarRepeticion: string; sistemaRepeticion: Clave; dias: number; ventana: number;
 }
-export interface TrazaSistema { clave: Clave; peticiones: number; ms: number; estado: "ok" | "sin_registro" | "no_disponible"; error: string | null }
+export interface TrazaSistema { clave: Clave; peticiones: number; ms: number; estado: "ok" | "sin_registro" | "no_disponible"; error: string | null; examenes?: number }
+// Origen de un dato: el sistema que lo tiene, su establecimiento y, si existe, la fecha del registro.
+export interface Fuente { clave: Clave; lugar: string; fecha?: string }
 export interface Resumen {
   dni: string; nombre: string; sexo: string; edad: number;
   establecimientos: { clave: Clave; idLocal: string | null; estado: TrazaSistema["estado"] }[];
-  condiciones: { codigo: string; nombre: string; fuentes: string[] }[];
-  alergias: { sustancia: string; reaccion: string; fuentes: string[] }[];
-  medicamentos: { nombre: string; fuentes: string[] }[];
+  condiciones: { codigo: string; nombre: string; fuentes: Fuente[] }[];
+  alergias: { sustancia: string; reaccion: string; fuentes: Fuente[] }[];
+  medicamentos: { nombre: string; fuentes: Fuente[] }[];
   examenes: Examen[]; repetidos: Alerta[];
   traza: { total: number; sistemas: TrazaSistema[]; examenes: number; traducidos: number };
 }
@@ -222,17 +224,17 @@ async function consultarHistorial(dni: string, medico = MEDICO.nombre, motivo = 
     for (const m of r.MedicationStatement) {
       const t: string = m.medicationCodeableConcept.text, k = t.toLowerCase();
       if (!meds.has(k)) meds.set(k, { nombre: t, fuentes: [] });
-      meds.get(k)!.fuentes.push(est);
+      meds.get(k)!.fuentes.push({ clave, lugar: est, fecha: m.effectiveDateTime?.slice(0, 10) });
     }
     for (const a of r.AllergyIntolerance) {
       const k = (a.code.text as string).toLowerCase();
       if (!alergias.has(k)) alergias.set(k, { sustancia: a.code.text, reaccion: a.reaction[0].description, fuentes: [] });
-      alergias.get(k)!.fuentes.push(est);
+      alergias.get(k)!.fuentes.push({ clave, lugar: est });
     }
     for (const c of r.Condition) {
       const k: string = c.code.coding[0].code;
       if (!condiciones.has(k)) condiciones.set(k, { codigo: k, nombre: c.code.text, fuentes: [] });
-      condiciones.get(k)!.fuentes.push(est);
+      condiciones.get(k)!.fuentes.push({ clave, lugar: est });
     }
   }
   examenes.sort((a, b) => b.fecha.localeCompare(a.fecha));
@@ -244,7 +246,7 @@ async function consultarHistorial(dni: string, medico = MEDICO.nombre, motivo = 
       .map((r) => ({ clave: r.clave, idLocal: r.datos?.paciente.id ?? null, estado: r.traza.estado })),
     condiciones: [...condiciones.values()], alergias: [...alergias.values()], medicamentos: [...meds.values()],
     examenes, repetidos: examenesRepetidos(examenes),
-    traza: { total: ahora() - t0, sistemas: resultados.map((r) => r.traza), examenes: examenes.length, traducidos },
+    traza: { total: ahora() - t0, sistemas: resultados.map((r) => ({ ...r.traza, examenes: examenes.filter((e) => e.sistema === r.clave).length })), examenes: examenes.length, traducidos },
   };
 }
 

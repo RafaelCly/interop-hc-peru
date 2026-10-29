@@ -4,7 +4,7 @@ import { useState, type RefObject } from "react";
 import {
   ArrowsClockwise, CheckCircle, CloudSlash, Copy, LockKey, LockKeyOpen, ShieldCheck, Warning,
 } from "@phosphor-icons/react";
-import { api, SISTEMAS, type Pedido, type Resumen, type Terminologia } from "@/lib/gateway";
+import { api, SISTEMAS, type Fuente, type Pedido, type Resumen, type Terminologia } from "@/lib/gateway";
 import { Chip, btn, fecha, fechaHora, ms, panel } from "../ui";
 import { mensajeAlerta, sexo } from "../textos";
 
@@ -53,6 +53,18 @@ function Lista<T>({ items, vacio = "Sin registros.", fila }: { items: T[]; vacio
   return items.length
     ? <ul className="mt-3 divide-y divide-line">{items.map((x, i) => <li key={i} className="py-2.5 first:pt-0 last:pb-0">{fila(x)}</li>)}</ul>
     : <p className="mt-3 text-sm text-muted">{vacio}</p>;
+}
+function Origenes({ fuentes, conFecha }: { fuentes: Fuente[]; conFecha?: boolean }) {
+  return (
+    <span className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
+      {fuentes.map((f) => (
+        <span key={f.clave} className="inline-flex items-center gap-2 text-[0.82rem] text-muted" title={f.lugar}>
+          <Chip clave={f.clave} />
+          {conFecha && f.fecha ? <>desde {fecha(f.fecha)}</> : <span className="hidden sm:inline">{f.lugar}</span>}
+        </span>
+      ))}
+    </span>
+  );
 }
 const Sub = ({ children }: { children: React.ReactNode }) => <small className="block text-[0.82rem] text-muted">{children}</small>;
 
@@ -172,12 +184,13 @@ export function ResultadoResumen({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <section className={panel}><h2 className="text-lg font-semibold">Medicamentos</h2>
-          <Lista items={r.medicamentos} fila={(m) => <>{m.nombre}<Sub>{m.fuentes.join(", ")}</Sub></>} /></section>
+          <p className="mt-1 text-[0.82rem] text-muted">Tratamiento registrado en cada sistema y desde cuándo.</p>
+          <Lista items={r.medicamentos} fila={(m) => <><span className="font-medium">{m.nombre}</span><Origenes fuentes={m.fuentes} conFecha /></>} /></section>
         <section className={panel}><h2 className="text-lg font-semibold">Alergias</h2>
-          <Lista items={r.alergias} fila={(a) => <><span className="block font-semibold text-danger">{a.sustancia}</span>{a.reaccion}<Sub>Registrada en: {a.fuentes.join(", ")}</Sub></>} /></section>
+          <Lista items={r.alergias} fila={(a) => <><span className="block font-semibold text-danger">{a.sustancia}</span>{a.reaccion}<Origenes fuentes={a.fuentes} /></>} /></section>
       </div>
       <section className={panel}><h2 className="text-lg font-semibold">Condiciones</h2>
-        <Lista items={r.condiciones} fila={(c) => <>{c.nombre}<Sub>CIE-10 {c.codigo}. {c.fuentes.join(", ")}</Sub></>} /></section>
+        <Lista items={r.condiciones} fila={(c) => <>{c.nombre}<Sub>CIE-10 {c.codigo}</Sub><Origenes fuentes={c.fuentes} /></>} /></section>
 
       <section className={panel}>
         <details className="group">
@@ -185,12 +198,13 @@ export function ResultadoResumen({
             <ArrowsClockwise size={18} aria-hidden className="transition-transform group-open:rotate-180" /> Cómo se armó este resumen
           </summary>
           <table className="mt-4 w-full border-collapse text-[0.9rem]">
-            <thead><tr className="text-left text-[0.8rem] text-muted">{["Sistema", "Peticiones", "Tiempo", "Estado"].map((h) => <th key={h} scope="col" className="border-b border-line px-3 py-2 font-medium">{h}</th>)}</tr></thead>
+            <thead><tr className="text-left text-[0.8rem] text-muted">{["Sistema", "Peticiones", "Exámenes", "Tiempo", "Estado"].map((h) => <th key={h} scope="col" className="border-b border-line px-3 py-2 font-medium">{h}</th>)}</tr></thead>
             <tbody>
               {r.traza.sistemas.map((s) => (
                 <tr key={s.clave}>
                   <td className="border-b border-line px-3 py-2.5"><Chip clave={s.clave} /></td>
                   <td className="border-b border-line px-3 py-2.5 tabular-nums">{s.peticiones}</td>
+                  <td className="border-b border-line px-3 py-2.5 tabular-nums">{s.estado === "ok" ? s.examenes : "-"}</td>
                   <td className="border-b border-line px-3 py-2.5 font-mono text-[0.85rem] tabular-nums">{ms(s.ms)}</td>
                   <td className={`border-b border-line px-3 py-2.5 font-medium ${s.estado === "ok" ? "text-ok" : s.estado === "no_disponible" ? "text-danger" : "text-muted"}`}>
                     {s.estado === "ok" ? "Respondió" : s.estado === "no_disponible" ? "No disponible" : "Sin registro"}
@@ -200,7 +214,7 @@ export function ResultadoResumen({
             </tbody>
           </table>
           <p className="mt-3 text-sm text-muted">
-            {r.traza.examenes} exámenes unificados{r.traza.traducidos ? `, ${r.traza.traducidos} con código local traducido a LOINC` : ""}. Las consultas corren en paralelo: el tiempo total fue {ms(r.traza.total)}.
+            Se unificaron {r.traza.examenes} exámenes, los de la tabla de exámenes: {r.traza.sistemas.filter((s) => s.examenes).map((s) => `${s.examenes} de ${SISTEMAS[s.clave].corto}`).join(" y ")}.{r.traza.traducidos ? ` ${r.traza.traducidos} llegaron con código local y se tradujeron a LOINC.` : ""} Las consultas corren en paralelo, por eso el tiempo total fue {ms(r.traza.total)} y no la suma de cada sistema.
             {terminologia.version && ` Nombres de los exámenes verificados en el servicio de terminología de HL7 (tx.fhir.org), LOINC ${terminologia.version}.`}
           </p>
         </details>
