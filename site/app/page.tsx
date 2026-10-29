@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Copy, GitMerge, PlugsConnected, ShieldCheck } from "@phosphor-icons/react/dist/ssr";
-import { CASOS, SISTEMAS, type Clave } from "@/lib/data";
+import { CASOS, type Clave } from "@/lib/data";
 import { HeroCard } from "@/components/hero-card";
 import { Flujo } from "@/components/flujo";
 import { CountUp } from "@/components/count-up";
@@ -28,6 +28,30 @@ const funciones = [
 ];
 
 const casos = CASOS.filter((c) => c.titulo);
+
+// Cinta de casos. La segunda copia cierra el bucle de la animación y queda fuera del teclado y de los lectores de pantalla.
+function ListaCasos({ duplicado }: { duplicado?: boolean }) {
+  return (
+    <ul className={`flex gap-4 ${duplicado ? "marquee-dup" : ""}`} aria-hidden={duplicado || undefined} inert={duplicado || undefined}>
+      {casos.map((c) => (
+        <li key={c.dni} className="flex">
+          <article className="flex w-80 shrink-0 flex-col gap-3 rounded-card border border-line bg-surface p-5 shadow-card">
+            <span className="font-mono text-[0.8rem] text-muted">DNI {c.dni}</span>
+            <div>
+              <h3 className="text-[1.05rem] font-semibold leading-snug">{c.titulo}</h3>
+              <p className="mt-0.5 text-[0.9rem] text-muted">{c.nombres} {c.apellidos}</p>
+            </div>
+            <div className="flex flex-wrap gap-1.5">{(c.sistemas as Clave[]).map((k) => <Chip key={k} clave={k} />)}</div>
+            <p className="flex-1 text-[0.92rem] text-muted">{c.muestra}</p>
+            <Link href={`/visor/${c.dni}`} className={`${btn.secondary} ${btn.sm} self-start`}>
+              Abrir caso <ArrowRight size={16} aria-hidden />
+            </Link>
+          </article>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export default function Inicio() {
   return (
@@ -89,38 +113,35 @@ export default function Inicio() {
       <Reveal as="section" className="py-14 sm:py-20">
         <div className={contenedor}>
           <h2 className="text-[clamp(1.6rem,1.1rem+1.8vw,2.4rem)] font-semibold">Seis casos para probar</h2>
+          <p className="mt-3 max-w-[52ch] text-muted">Cada uno muestra una situación distinta. Ábralos en el visor y compare.</p>
         </div>
-        <div
-          tabIndex={0}
-          role="region"
-          aria-label="Casos de demostración, desplazable"
-          className="mt-8 flex snap-x snap-mandatory gap-4 overflow-x-auto px-[max(1.25rem,calc((100vw-1200px)/2))] scroll-pl-[max(1.25rem,calc((100vw-1200px)/2))] pb-4 [scrollbar-width:thin]"
-        >
-          {casos.map((c) => (
-            <article key={c.dni} className="flex w-[min(20rem,82vw)] shrink-0 snap-start flex-col gap-3 rounded-card border border-line bg-surface p-5 shadow-card">
-              <span className="font-mono text-[0.8rem] text-muted">DNI {c.dni}</span>
-              <div>
-                <h3 className="text-[1.05rem] font-semibold leading-snug">{c.titulo}</h3>
-                <p className="mt-0.5 text-[0.9rem] text-muted">{c.nombres} {c.apellidos}</p>
-              </div>
-              <div className="flex flex-wrap gap-1.5">{(c.sistemas as Clave[]).map((k) => <Chip key={k} clave={k} />)}</div>
-              <p className="flex-1 text-[0.92rem] text-muted">{c.muestra}</p>
-              <Link href={`/visor/${c.dni}`} className={`${btn.secondary} ${btn.sm} self-start`}>
-                Abrir caso <ArrowRight size={16} aria-hidden />
-              </Link>
-            </article>
-          ))}
+        <div className="marquee mt-10" aria-label="Casos de demostración">
+          <div className="marquee-track">
+            <ListaCasos />
+            <ListaCasos duplicado />
+          </div>
         </div>
       </Reveal>
 
       <Reveal as="section" className={`${contenedor} py-14 sm:py-20`}>
         <h2 id="como-funciona" className="mb-10 text-[clamp(1.6rem,1.1rem+1.8vw,2.4rem)] font-semibold">Cómo se conectan los sistemas</h2>
         <Flujo />
-        <p className="mt-8 max-w-[70ch] text-[0.92rem] text-muted">
-          Cada consulta del visor pasa por {Object.keys(SISTEMAS).length} endpoints FHIR del propio sitio
-          (<code className="font-mono text-[0.85em]">/api/fhir/&#123;sistema&#125;/&#123;recurso&#125;</code>) con datos ficticios. El siguiente paso es
-          sustituirlos por los sistemas reales y guardar consentimientos y accesos en una base de datos.
-        </p>
+      </Reveal>
+
+      <Reveal as="section" className={`${contenedor} pb-6 pt-8 sm:pt-12`}>
+        <div className="relative overflow-hidden rounded-[1.5rem] bg-ink px-6 py-12 text-bg sm:px-12 sm:py-16">
+          <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 size-80 rounded-full bg-accent/25 blur-3xl" />
+          <h2 className="relative max-w-[20ch] text-[clamp(1.8rem,1.2rem+2.4vw,3rem)] font-bold leading-[1.05] tracking-tight">
+            Vea un historial completo en segundos
+          </h2>
+          <p className="relative mt-4 max-w-[46ch] text-[1.05rem] text-bg/75">
+            Elija un caso y compruebe cómo se unifican tres sistemas y cómo se detecta un examen repetido.
+          </p>
+          <div className="relative mt-8 flex flex-wrap gap-3">
+            <Link href="/visor/90000001" className={`${btn.primary} !bg-accent`}>Abrir un caso <ArrowRight size={18} aria-hidden /></Link>
+            <Link href="/visor" className={`${btn.ghost} !border-bg/30 !text-bg hover:!bg-bg/10`}>Ir al visor</Link>
+          </div>
+        </div>
       </Reveal>
     </>
   );

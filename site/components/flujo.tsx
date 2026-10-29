@@ -9,9 +9,9 @@ const claves = Object.keys(SISTEMAS) as Clave[];
 
 function Abanico() {
   return (
-    <svg viewBox={`0 0 100 ${ALTO}`} preserveAspectRatio="none" className="hidden h-72 w-24 text-line lg:block" aria-hidden="true">
+    <svg viewBox={`0 0 160 ${ALTO}`} preserveAspectRatio="none" className="hidden h-72 min-w-20 flex-1 text-line lg:block" aria-hidden="true">
       {ys.map((y, i) => {
-        const d = `M0 144 C 55 144, 45 ${y}, 100 ${y}`;
+        const d = `M0 144 C 90 144, 70 ${y}, 160 ${y}`;
         return (
           <g key={y}>
             <path d={d} fill="none" stroke="currentColor" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
@@ -26,9 +26,9 @@ function Abanico() {
 }
 
 function Recto({ invertido }: { invertido?: boolean }) {
-  const d = invertido ? "M100 4 L0 4" : "M0 4 L100 4";
+  const d = invertido ? "M160 4 L0 4" : "M0 4 L160 4";
   return (
-    <svg viewBox="0 0 100 8" preserveAspectRatio="none" className="hidden h-2 w-20 text-line lg:block" aria-hidden="true">
+    <svg viewBox="0 0 160 8" preserveAspectRatio="none" className="hidden h-2 min-w-12 flex-1 text-line lg:block" aria-hidden="true">
       <path d={d} stroke="currentColor" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
       <circle r="3" cy="4" className="paquete fill-accent">
         <animateMotion dur="2s" repeatCount="indefinite" path={d} />

@@ -1,32 +1,61 @@
+import Link from "next/link";
 import { contenedor } from "./ui";
 
-const integrantes = ["Chu-Lau Yllescas, Rafael Andrés", "Condori Mamani, Ruben Alcides", "Diaz Vergaray, Edward José"];
+const RENIPRESS =
+  "https://www.datosabiertos.gob.pe/dataset/registro-nacional-de-entidades-prestadoras-de-servicios-de-salud-renipress";
+
+const columnas = [
+  {
+    titulo: "Producto",
+    enlaces: [
+      { href: "/visor", texto: "Visor de historia clínica" },
+      { href: "/visor/90000001", texto: "Ver un caso" },
+      { href: "/#como-funciona", texto: "Cómo funciona" },
+    ],
+  },
+  {
+    titulo: "Estándares",
+    enlaces: [
+      { href: "https://hl7.org/fhir/R4/", texto: "HL7 FHIR R4", externo: true },
+      { href: "https://loinc.org", texto: "LOINC", externo: true },
+      { href: RENIPRESS, texto: "RENIPRESS, SUSALUD", externo: true },
+    ],
+  },
+];
 
 export function SiteFooter() {
   return (
-    <footer className="mt-16 border-t border-line py-10 text-[0.92rem] text-muted">
-      <div className={`${contenedor} grid gap-8 sm:grid-cols-2`}>
-        <div className="space-y-1.5">
-          <p className="font-semibold text-ink">interop-hc-peru</p>
-          <p>Prototipo del curso TE111U Innovación y Gestión Tecnológica, UNI-FIIS. Grupo C.</p>
-          <ul className="pt-1">
-            {integrantes.map((n) => <li key={n}>{n}</li>)}
-          </ul>
+    <footer className="mt-12 border-t border-line">
+      <div className={`${contenedor} grid gap-10 py-12 sm:grid-cols-[1.4fr_1fr_1fr]`}>
+        <div>
+          <Link href="/" className="font-mono text-[0.95rem] font-medium tracking-tight text-ink no-underline">
+            interop<span className="text-accent-strong">-hc-</span>peru
+          </Link>
+          <p className="mt-3 max-w-[32ch] text-[0.95rem] text-muted">
+            El historial clínico del paciente, unificado entre Minsa, EsSalud y clínicas.
+          </p>
         </div>
-        <div className="space-y-1.5">
-          <p className="font-semibold text-ink">Datos</p>
-          <p>
-            Los establecimientos provienen de{" "}
-            <a className="text-accent-strong underline underline-offset-[3px]" href="https://www.datosabiertos.gob.pe/dataset/registro-nacional-de-entidades-prestadoras-de-servicios-de-salud-renipress" rel="noopener">
-              RENIPRESS (SUSALUD, sep. 2026)
-            </a>
-            . Los pacientes y sus registros son ficticios.
-          </p>
-          <p>
-            <a className="text-accent-strong underline underline-offset-[3px]" href="https://github.com/RafaelCly/interop-hc-peru" rel="noopener">
-              Código en GitHub
-            </a>
-          </p>
+        {columnas.map((c) => (
+          <nav key={c.titulo} aria-label={c.titulo}>
+            <h2 className="text-[0.8rem] font-semibold uppercase tracking-[0.08em] text-muted">{c.titulo}</h2>
+            <ul className="mt-3 space-y-2 text-[0.95rem]">
+              {c.enlaces.map((e) => (
+                <li key={e.texto}>
+                  {"externo" in e ? (
+                    <a href={e.href} rel="noopener" className="text-ink underline-offset-4 hover:text-accent-strong hover:underline">{e.texto}</a>
+                  ) : (
+                    <Link href={e.href} className="text-ink underline-offset-4 hover:text-accent-strong hover:underline">{e.texto}</Link>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </nav>
+        ))}
+      </div>
+      <div className="border-t border-line">
+        <div className={`${contenedor} flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-5 text-[0.82rem] text-muted`}>
+          <p>© 2026 interop-hc-peru</p>
+          <p>Versión de demostración. Los pacientes y sus registros son ficticios.</p>
         </div>
       </div>
     </footer>

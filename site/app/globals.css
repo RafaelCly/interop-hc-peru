@@ -91,5 +91,17 @@ p { text-wrap: pretty; }
   .tabla-ex td, .tabla-ex th { padding: 0 !important; border: 0 !important; }
 }
 
+/* Cinta de casos: se mueve sola, se pausa con el mouse o el foco y no usa barra de desplazamiento */
+.marquee { overflow: hidden; -webkit-mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent); mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent); }
+.marquee-track { display: flex; gap: 1rem; width: max-content; padding-block: 0.5rem 1.25rem; animation: cinta 55s linear infinite; }
+.marquee:hover .marquee-track, .marquee:focus-within .marquee-track { animation-play-state: paused; }
+@keyframes cinta { to { transform: translateX(calc(-50% - 0.5rem)); } }
+@media (prefers-reduced-motion: reduce) {
+  .marquee { -webkit-mask-image: none; mask-image: none; }
+  .marquee-track { animation: none; width: min(100% - 2.5rem, 1200px); margin-inline: auto; }
+  .marquee-track ul { flex-wrap: wrap; }
+  .marquee-dup { display: none; }
+}
+
 /* Paquetes del diagrama (SMIL): se ocultan si el usuario pide menos movimiento */
 @media (prefers-reduced-motion: reduce) { .paquete { display: none; } }
