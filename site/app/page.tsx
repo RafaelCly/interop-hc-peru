@@ -56,7 +56,7 @@ function ListaCasos({ duplicado }: { duplicado?: boolean }) {
 export default function Inicio() {
   return (
     <>
-      <section className={`${contenedor} grid items-center gap-10 py-12 sm:py-16 lg:min-h-[min(82dvh,46rem)] lg:grid-cols-[1.1fr_0.9fr] lg:gap-20`} aria-labelledby="h-hero">
+      <section className={`${contenedor} grid items-center gap-10 py-10 sm:py-12 lg:min-h-[calc(100dvh-4rem)] lg:grid-cols-[1.1fr_0.9fr] lg:gap-20`} aria-labelledby="h-hero">
         <div>
           <h1 id="h-hero" className="text-[clamp(2.4rem,1.1rem+4.6vw,4.4rem)] font-bold leading-[1.02] tracking-[-0.04em]">
             El historial del paciente, en una sola vista
@@ -110,7 +110,7 @@ export default function Inicio() {
         </ul>
       </Reveal>
 
-      <Reveal as="section" className="py-14 sm:py-20">
+      <section className="py-14 sm:py-20">
         <div className={contenedor}>
           <h2 className="text-[clamp(1.6rem,1.1rem+1.8vw,2.4rem)] font-semibold">Seis casos para probar</h2>
           <p className="mt-3 max-w-[52ch] text-muted">Cada uno muestra una situación distinta. Ábralos en el visor y compare.</p>
@@ -121,7 +121,7 @@ export default function Inicio() {
             <ListaCasos duplicado />
           </div>
         </div>
-      </Reveal>
+      </section>
 
       <Reveal as="section" className={`${contenedor} py-14 sm:py-20`}>
         <h2 id="como-funciona" className="mb-10 text-[clamp(1.6rem,1.1rem+1.8vw,2.4rem)] font-semibold">Cómo se conectan los sistemas</h2>
@@ -129,8 +129,10 @@ export default function Inicio() {
       </Reveal>
 
       <Reveal as="section" className={`${contenedor} pb-6 pt-8 sm:pt-12`}>
-        <div className="relative overflow-hidden rounded-[1.5rem] bg-ink px-6 py-12 text-bg sm:px-12 sm:py-16">
-          <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 size-80 rounded-full bg-accent/25 blur-3xl" />
+        <div
+          className="relative overflow-hidden rounded-[1.5rem] bg-ink px-6 py-10 text-bg sm:px-12 sm:py-12"
+          style={{ backgroundImage: "radial-gradient(60% 120% at 100% 0%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 70%)" }}
+        >
           <h2 className="relative max-w-[20ch] text-[clamp(1.8rem,1.2rem+2.4vw,3rem)] font-bold leading-[1.05] tracking-tight">
             Vea un historial completo en segundos
           </h2>

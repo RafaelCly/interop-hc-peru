@@ -38,7 +38,7 @@ function BotonTema() {
 export function SiteHeader() {
   const ruta = usePathname();
   return (
-    <header className="sticky top-0 z-20 border-b border-line bg-bg/85 backdrop-blur-md">
+    <header className="sticky top-0 z-20 border-b border-line bg-bg">
       <div className={`${contenedor} flex min-h-16 items-center justify-between gap-4`}>
         <Link href="/" className="whitespace-nowrap font-mono text-[0.95rem] font-medium tracking-tight text-ink no-underline">
           interop<span className="text-accent-strong">-hc-</span>peru

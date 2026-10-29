@@ -25,8 +25,8 @@ const columnas = [
 
 export function SiteFooter() {
   return (
-    <footer className="mt-12 border-t border-line">
-      <div className={`${contenedor} grid gap-10 py-12 sm:grid-cols-[1.4fr_1fr_1fr]`}>
+    <footer className="mt-8 border-t border-line">
+      <div className={`${contenedor} grid gap-8 py-8 sm:grid-cols-[1.4fr_1fr_1fr]`}>
         <div>
           <Link href="/" className="font-mono text-[0.95rem] font-medium tracking-tight text-ink no-underline">
             interop<span className="text-accent-strong">-hc-</span>peru
