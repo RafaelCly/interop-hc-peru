@@ -8,7 +8,7 @@
   --warn: #8f4305; --warn-bg: #fff2e1; --warn-line: #e3a259;
   --danger: #a3271c; --danger-bg: #fdeceb; --danger-line: #e8a49d;
   --ok: #22693a; --ok-bg: #e5f3e9; --ok-line: #9ccfae;
-  --minsa: #2d5c9b; --essalud: #277350; --clinica: #965420;
+  --minsa: #264f87; --essalud: #1d6040; --clinica: #85481a;
   --shadow: 0 1px 2px rgb(16 32 46 / .06), 0 12px 32px rgb(16 32 46 / .07);
   --ring: 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent);
 }
@@ -20,7 +20,7 @@
     --warn: #f2b36f; --warn-bg: #3a2a15; --warn-line: #b57d3b;
     --danger: #ff9d92; --danger-bg: #3c1c19; --danger-line: #8a3a33;
     --ok: #86d49d; --ok-bg: #163524; --ok-line: #2f6b48;
-    --minsa: #84aeea; --essalud: #73d3a3; --clinica: #e5ab75;
+    --minsa: #9dbdf0; --essalud: #7fdcad; --clinica: #efbc8c;
     --shadow: 0 1px 2px rgb(0 0 0 / .35), 0 12px 32px rgb(0 0 0 / .32);
   }
 }
@@ -31,7 +31,7 @@
   --warn: #f2b36f; --warn-bg: #3a2a15; --warn-line: #b57d3b;
   --danger: #ff9d92; --danger-bg: #3c1c19; --danger-line: #8a3a33;
   --ok: #86d49d; --ok-bg: #163524; --ok-line: #2f6b48;
-  --minsa: #84aeea; --essalud: #73d3a3; --clinica: #e5ab75;
+  --minsa: #9dbdf0; --essalud: #7fdcad; --clinica: #efbc8c;
   --shadow: 0 1px 2px rgb(0 0 0 / .35), 0 12px 32px rgb(0 0 0 / .32);
 }
 
@@ -90,6 +90,21 @@ p { text-wrap: pretty; }
   .tabla-ex td[data-label]::before { content: attr(data-label) ": "; color: var(--muted); font-size: .8rem; }
   .tabla-ex td, .tabla-ex th { padding: 0 !important; border: 0 !important; }
 }
+
+/* Portada: fondo de puntos, trazo de ECG y entrada escalonada */
+.fondo-puntos {
+  background-image: radial-gradient(color-mix(in srgb, var(--ink) 16%, transparent) 1px, transparent 1.4px);
+  background-size: 26px 26px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 70% at 25% 35%, #000 0%, transparent 75%);
+  mask-image: radial-gradient(ellipse 75% 70% at 25% 35%, #000 0%, transparent 75%);
+}
+.ecg-trazo { stroke-dasharray: 1; stroke-dashoffset: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .ecg-trazo { stroke-dashoffset: 1; animation: trazo 3.4s 0.3s cubic-bezier(0.45, 0, 0.2, 1) forwards; }
+  .entrada { animation: subir 0.8s var(--ease-out-expo) both; animation-delay: var(--d, 0s); }
+}
+@keyframes trazo { to { stroke-dashoffset: 0; } }
+@keyframes subir { from { opacity: 0; transform: translateY(14px); } }
 
 /* Cinta de casos: se mueve sola, se pausa con el mouse o el foco y no usa barra de desplazamiento */
 .marquee { position: relative; overflow: hidden; }

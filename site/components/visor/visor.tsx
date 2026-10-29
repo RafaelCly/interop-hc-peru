@@ -16,8 +16,8 @@ type Estado =
 
 export function Visor({ dni }: { dni?: string }) {
   const router = useRouter();
-  const [casos, setCasos] = useState<Caso[]>([]);
-  const [sistemas, setSistemas] = useState<EstadoSistema[]>([]);
+  const [casos, setCasos] = useState<Caso[]>(() => api.casosBase());
+  const [sistemas, setSistemas] = useState<EstadoSistema[]>(() => api.sistemas());
   const [estado, setEstado] = useState<Estado>({ tipo: "vacio" });
   const [accesos, setAccesos] = useState(0); // fuerza el repintado del registro
   const [campo, setCampo] = useState(dni ?? "");
@@ -165,7 +165,7 @@ export function Visor({ dni }: { dni?: string }) {
         </section>
       </aside>
 
-      <div className="grid min-w-0 gap-4" aria-live="polite">
+      <div className="grid min-h-[85dvh] min-w-0 content-start gap-4" aria-live="polite">
         {
           <motion.div
             key={estado.tipo === "ok" ? `ok-${estado.r.dni}` : estado.tipo}

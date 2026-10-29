@@ -7,6 +7,7 @@ import { CountUp } from "@/components/count-up";
 import { Reveal } from "@/components/reveal";
 import { EnPantalla } from "@/components/en-pantalla";
 import { Chip, btn, contenedor } from "@/components/ui";
+import { Ecg } from "@/components/ecg";
 
 const LINKS = {
   dyer: "https://www.infobae.com/peru/2026/08/06/ministro-de-salud-luis-dyer-revela-que-archivos-del-minsa-aun-se-guardan-en-cd-estamos-en-el-ano-95/",
@@ -57,40 +58,47 @@ function ListaCasos({ duplicado }: { duplicado?: boolean }) {
 export default function Inicio() {
   return (
     <>
-      <section className={`${contenedor} grid items-center gap-10 py-10 sm:py-12 lg:min-h-[calc(100dvh-4rem)] lg:grid-cols-[1.1fr_0.9fr] lg:gap-20`} aria-labelledby="h-hero">
-        <div>
-          <h1 id="h-hero" className="text-[clamp(2.4rem,1.1rem+4.6vw,4.4rem)] font-bold leading-[1.02] tracking-[-0.04em]">
-            El historial del paciente, en una sola vista
-          </h1>
-          <p className="mt-6 max-w-[34ch] text-[clamp(1.05rem,0.95rem+0.5vw,1.3rem)] leading-normal text-muted">
-            Conecta Minsa, EsSalud y clínicas por DNI y avisa antes de repetir un examen que ya existe.
-          </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Link href="/visor" className={btn.primary}>Abrir el visor <ArrowRight size={18} aria-hidden /></Link>
-            <a href="#como-funciona" className={btn.ghost}>Cómo funciona</a>
+      <div className="relative isolate overflow-hidden">
+        <div aria-hidden="true" className="fondo-puntos absolute inset-0 -z-20" />
+        <Ecg className="ecg absolute inset-x-0 bottom-[7%] -z-10 h-40 w-full" />
+        <section className={`${contenedor} grid items-center gap-10 py-10 sm:py-12 lg:min-h-[calc(100dvh-4rem)] lg:grid-cols-[1.1fr_0.9fr] lg:gap-20`} aria-labelledby="h-hero">
+          <div>
+            <p className="entrada mb-5 inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3.5 py-1.5 text-[0.82rem] font-medium text-muted">
+              <span className="size-1.5 rounded-full bg-accent" aria-hidden="true" /> Interoperabilidad de la historia clínica, sobre FHIR
+            </p>
+            <h1 id="h-hero" className="text-[clamp(2.4rem,1.1rem+4.6vw,4.4rem)] font-bold leading-[1.02] tracking-[-0.04em]">
+              El historial del paciente, en una sola vista
+            </h1>
+            <p className="entrada mt-6 max-w-[34ch] text-[clamp(1.05rem,0.95rem+0.5vw,1.3rem)] leading-normal text-muted" style={{ "--d": "0.15s" } as React.CSSProperties}>
+              Conecta Minsa, EsSalud y clínicas por DNI y avisa antes de repetir un examen que ya existe.
+            </p>
+            <div className="entrada mt-8 flex flex-wrap gap-3" style={{ "--d": "0.25s" } as React.CSSProperties}>
+              <Link href="/visor" className={btn.primary}>Abrir el visor <ArrowRight size={18} aria-hidden /></Link>
+              <a href="#como-funciona" className={btn.ghost}>Cómo funciona</a>
+            </div>
           </div>
-        </div>
-        <HeroCard />
-      </section>
+          <HeroCard />
+        </section>
+      </div>
 
       <Reveal as="section" className={`${contenedor} py-14 sm:py-20`}>
         <h2 className="max-w-[24ch] text-[clamp(1.6rem,1.1rem+1.8vw,2.4rem)] font-semibold">Hoy el historial no viaja con el paciente</h2>
-        <dl className="mt-10 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
+        <ul className="mt-10 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
           {cifras.map((c) => (
-            <div key={c.fuente} className="flex flex-col border-t-2 border-accent pt-4">
-              <dd className="order-1 text-[clamp(2.4rem,2rem+1.6vw,3.4rem)] font-bold leading-none tracking-tight">
+            <li key={c.fuente} className="flex flex-col border-t-2 border-accent pt-4">
+              <p className="order-1 text-[clamp(2.4rem,2rem+1.6vw,3.4rem)] font-bold leading-none tracking-tight">
                 <CountUp valor={c.valor} decimales={c.dec} />
                 <small className="ml-0.5 text-[0.5em] font-semibold text-muted">{c.sufijo}</small>
-              </dd>
-              <dt className="order-2 mt-3 text-[0.95rem] text-muted">{c.texto}</dt>
+              </p>
+              <p className="order-2 mt-3 text-[0.95rem] text-muted">{c.texto}</p>
               {c.href ? (
                 <a href={c.href} rel="noopener" className="order-3 mt-3 text-[0.8rem] text-accent-strong underline underline-offset-[3px]">{c.fuente}</a>
               ) : (
                 <span className="order-3 mt-3 text-[0.8rem] text-muted">{c.fuente}</span>
               )}
-            </div>
+            </li>
           ))}
-        </dl>
+        </ul>
       </Reveal>
 
       <Reveal as="section" className={`${contenedor} grid gap-10 py-14 sm:py-20 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20`}>

@@ -111,22 +111,57 @@ export function ResultadoResumen({
 }: { r: Resumen; catalogo: { codigo: string; nombre: string }[]; accesosKey: number; terminologia: Terminologia; onRevocar: () => void; encabezadoRef: RefObject<HTMLHeadingElement | null> }) {
   const dup = new Set(r.repetidos.flatMap((a) => [`${a.codigo}|${a.fechaAnterior}`, `${a.codigo}|${a.fechaRepeticion}`]));
   const caidos = r.establecimientos.filter((e) => e.estado === "no_disponible");
-  const accesos = api.accesos(r.dni).slice(0, 6);
+  const todos = api.accesos(r.dni);
+  const accesos = todos.slice(0, 6);
+  const otorgado = todos.find((a) => a.resultado === "consentimiento" && a.motivo === "otorgado");
   void accesosKey;
+  const palabras = r.nombre.split(" ");
+  const iniciales = ((palabras[0]?.[0] ?? "") + (palabras[1]?.[0] ?? "")).toUpperCase();
+  const resumen = [
+    { href: "#examenes", n: r.examenes.length, texto: "Exámenes" },
+    { href: "#medicamentos", n: r.medicamentos.length, texto: "Medicamentos" },
+    { href: "#alergias", n: r.alergias.length, texto: "Alergias" },
+    { href: "#condiciones", n: r.condiciones.length, texto: "Condiciones" },
+  ];
   return (
     <article className="grid gap-4" aria-labelledby="pac-nombre">
       <section className={panel}>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h2 id="pac-nombre" ref={encabezadoRef} tabIndex={-1} className="text-[clamp(1.6rem,1.2rem+1.4vw,2.2rem)] font-bold leading-tight tracking-tight">{r.nombre}</h2>
-            <p className="mt-1 text-sm text-muted"><span className="font-mono">DNI {r.dni}</span>, {r.edad} años, {sexo(r.sexo)}</p>
+        <div className="flex flex-wrap items-start justify-between gap-5">
+          <div className="flex items-center gap-4">
+            <span aria-hidden="true" className="grid size-14 shrink-0 place-items-center rounded-full bg-accent-soft text-lg font-bold tracking-tight text-accent-strong">{iniciales}</span>
+            <div>
+              <h2 id="pac-nombre" ref={encabezadoRef} tabIndex={-1} className="text-[clamp(1.6rem,1.2rem+1.4vw,2.2rem)] font-bold leading-tight tracking-tight">{r.nombre}</h2>
+              <p className="mt-1 text-sm text-muted"><span className="font-mono">DNI {r.dni}</span>, {r.edad} años, {sexo(r.sexo)}</p>
+            </div>
           </div>
-          <span className="inline-flex items-center gap-2 rounded-full bg-ok-bg py-1 pl-3.5 pr-1 text-sm font-medium text-ok">
-            <ShieldCheck size={18} aria-hidden /> Acceso autorizado
-            <button type="button" onClick={onRevocar} className="rounded-full bg-surface-2 px-3 py-1.5 text-[0.82rem] font-semibold text-ink hover:bg-line">Revocar</button>
-          </span>
+          <div className="sm:text-right">
+            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.08em] text-muted">Consentimiento del paciente</p>
+            <span className="mt-1.5 inline-flex items-center gap-2 rounded-full bg-ok-bg py-1 pl-3.5 pr-1 text-sm font-medium text-ok">
+              <ShieldCheck size={18} aria-hidden /> Autorizado{otorgado ? ` · ${fechaHora(otorgado.cuando)}` : ""}
+              <button type="button" onClick={onRevocar} className="rounded-full bg-surface-2 px-3 py-1.5 text-[0.82rem] font-semibold text-ink hover:bg-line">Revocar</button>
+            </span>
+          </div>
         </div>
-        <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-[0.85rem]">
+
+        {r.alergias.length > 0 && (
+          <div role="note" className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-ctl border border-danger-line bg-danger-bg px-4 py-2.5 text-danger">
+            <span className="inline-flex items-center gap-2 text-[0.9rem] font-bold"><Warning size={18} weight="fill" aria-hidden /> Alergias</span>
+            <span className="text-[0.95rem] font-semibold">{r.alergias.map((a) => a.sustancia).join(", ")}</span>
+          </div>
+        )}
+
+        <ul className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {resumen.map((t) => (
+            <li key={t.href}>
+              <a href={t.href} className="group block rounded-ctl border border-line bg-bg px-4 py-3 no-underline transition-colors hover:border-accent/50 hover:bg-accent-soft">
+                <span className="block text-[1.7rem] font-bold leading-none tracking-tight tabular-nums text-ink">{t.n}</span>
+                <span className="mt-1 block text-[0.82rem] text-muted group-hover:text-ink">{t.texto}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+
+        <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 border-t border-line pt-4 text-[0.85rem]">
           {r.establecimientos.map((e) => e.estado === "no_disponible"
             ? <span key={e.clave} className="inline-flex items-center gap-2 font-medium text-danger"><Chip clave={e.clave} /> <CloudSlash size={16} aria-hidden /> No disponible</span>
             : <span key={e.clave} className="inline-flex items-center gap-2"><Chip clave={e.clave} /> <code className="font-mono text-[0.8rem] text-muted">{e.idLocal}</code></span>)}
@@ -151,7 +186,7 @@ export function ResultadoResumen({
 
       <PedirExamen dni={r.dni} catalogo={catalogo} />
 
-      <section className={`${panel} tabla-ex`}>
+      <section id="examenes" className={`${panel} tabla-ex`}>
         <div role="region" tabIndex={0} aria-labelledby="tabla-cap" className="overflow-x-auto">
           <table className="w-full border-collapse text-[0.93rem]">
             <caption id="tabla-cap" className="pb-3 text-left text-lg font-semibold">Exámenes ({r.examenes.length})</caption>
@@ -169,7 +204,7 @@ export function ResultadoResumen({
                     <td data-label="Examen" className="border-b border-line px-3 py-3">
                       {e.nombre}
                       {e.codigo && <span className="block font-mono text-[0.75rem] text-muted">LOINC {e.codigo}{e.codigoOriginal ? ` (código local ${e.codigoOriginal} traducido)` : ""}</span>}
-                      {e.codigo && terminologia.items[e.codigo] && <span className="block text-[0.75rem] text-muted">{terminologia.items[e.codigo]}</span>}
+                      {e.codigo && <span className="block min-h-[1.1rem] text-[0.75rem] text-muted">{terminologia.items[e.codigo]}</span>}
                       {rep && <span className="mt-1 inline-flex items-center gap-1 text-[0.78rem] font-semibold text-warn"><Copy size={14} aria-hidden /> Repetido</span>}
                     </td>
                     <td data-label="Resultado" className="border-b border-line px-3 py-3 tabular-nums">{e.resultado}</td>
@@ -183,13 +218,13 @@ export function ResultadoResumen({
       </section>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <section className={panel}><h2 className="text-lg font-semibold">Medicamentos</h2>
+        <section id="medicamentos" className={panel}><h2 className="text-lg font-semibold">Medicamentos</h2>
           <p className="mt-1 text-[0.82rem] text-muted">Tratamiento indicado según cada sistema y fecha de la receta.</p>
           <Lista items={r.medicamentos} fila={(m) => <><span className="font-medium">{m.nombre}</span><Origenes fuentes={m.fuentes} prefijo="recetado el" /></>} /></section>
-        <section className={panel}><h2 className="text-lg font-semibold">Alergias</h2>
+        <section id="alergias" className={panel}><h2 className="text-lg font-semibold">Alergias</h2>
           <Lista items={r.alergias} fila={(a) => <><span className="block font-semibold text-danger">{a.sustancia}</span>{a.reaccion}<Origenes fuentes={a.fuentes} /></>} /></section>
       </div>
-      <section className={panel}><h2 className="text-lg font-semibold">Condiciones</h2>
+      <section id="condiciones" className={panel}><h2 className="text-lg font-semibold">Condiciones</h2>
         <Lista items={r.condiciones} fila={(c) => <>{c.nombre}<Sub>CIE-10 {c.codigo}</Sub><Origenes fuentes={c.fuentes} prefijo="desde" /></>} /></section>
 
       <section className={panel}>

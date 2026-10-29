@@ -261,6 +261,8 @@ export const api = {
     if (enLinea) caidos.delete(clave);
     else caidos.add(clave);
   },
+  // Lista inicial para el primer pintado (igual en servidor y cliente); casos() añade el consentimiento guardado.
+  casosBase: (): Caso[] => PACIENTES.map((p) => ({ ...p })),
   casos: (): Caso[] => PACIENTES.map((p) => ({ ...p, consentimiento: leer().consentimiento[p.dni] })),
   catalogo: () => Object.entries(CATALOGO).map(([codigo, [nombre, ventana, tipo]]) => ({ codigo, nombre, ventana, tipo })),
   resumen: (dni: string) => consultarHistorial(dni),
