@@ -98,12 +98,13 @@ p { text-wrap: pretty; }
   -webkit-mask-image: radial-gradient(ellipse 75% 70% at 25% 35%, #000 0%, transparent 75%);
   mask-image: radial-gradient(ellipse 75% 70% at 25% 35%, #000 0%, transparent 75%);
 }
-.ecg-trazo { stroke-dasharray: 1; stroke-dashoffset: 0; }
+.ecg-mov { will-change: transform; }
 @media (prefers-reduced-motion: no-preference) {
-  .ecg-trazo { stroke-dashoffset: 1; animation: trazo 3.4s 0.3s cubic-bezier(0.45, 0, 0.2, 1) forwards; }
+  .ecg-mov { animation: ecg-avanza 2.6s linear infinite; animation-play-state: paused; }
+  [data-vista="true"] .ecg-mov { animation-play-state: running; }
   .entrada { animation: subir 0.8s var(--ease-out-expo) both; animation-delay: var(--d, 0s); }
 }
-@keyframes trazo { to { stroke-dashoffset: 0; } }
+@keyframes ecg-avanza { to { transform: translate3d(-246px, 0, 0); } }
 @keyframes subir { from { opacity: 0; transform: translateY(14px); } }
 
 /* Cinta de casos: se mueve sola, se pausa con el mouse o el foco y no usa barra de desplazamiento */

@@ -60,7 +60,11 @@ export default function Inicio() {
     <>
       <div className="relative isolate overflow-hidden">
         <div aria-hidden="true" className="fondo-puntos absolute inset-0 -z-20" />
-        <Ecg className="ecg absolute inset-x-0 bottom-[7%] -z-10 h-40 w-full" />
+        <EnPantalla className="absolute inset-x-0 bottom-3 -z-10 h-28 overflow-hidden">
+          <Ecg className="ecg-mov block max-w-none" />
+          <div aria-hidden="true" className="absolute inset-y-0 left-0 w-[10%] bg-gradient-to-r from-bg to-transparent" />
+          <div aria-hidden="true" className="absolute inset-y-0 right-0 w-[10%] bg-gradient-to-l from-bg to-transparent" />
+        </EnPantalla>
         <section className={`${contenedor} grid items-center gap-10 py-10 sm:py-12 lg:min-h-[calc(100dvh-4rem)] lg:grid-cols-[1.1fr_0.9fr] lg:gap-20`} aria-labelledby="h-hero">
           <div>
             <p className="entrada mb-5 inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3.5 py-1.5 text-[0.82rem] font-medium text-muted">
