@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { CheckCircle, ListChecks, XCircle } from "@phosphor-icons/react";
-import { ErrorApi, api, type Caso, type EstadoSistema, type Resumen } from "@/lib/gateway";
+import { ErrorApi, api, type Caso, type EstadoSistema, type Resumen, type Terminologia } from "@/lib/gateway";
 import { Chip, btn, contenedor, panel } from "../ui";
 import { ResultadoError, ResultadoResumen, Cargando } from "./resultado";
 
@@ -45,9 +45,12 @@ export function Visor({ dni }: { dni?: string }) {
     }
   }, []);
 
+  const [terminologia, setTerminologia] = useState<Terminologia>({ version: null, items: {} });
+
   useEffect(() => {
     setCasos(api.casos());
     setSistemas(api.sistemas());
+    api.terminologia().then(setTerminologia);
   }, []);
 
   useEffect(() => {
@@ -181,7 +184,7 @@ export function Visor({ dni }: { dni?: string }) {
             {estado.tipo === "error" && <ResultadoError e={estado.e} onAutorizar={() => dni && autorizar(dni, true)} />}
             {estado.tipo === "ok" && (
               <ResultadoResumen
-                r={estado.r} catalogo={catalogo} accesosKey={accesos}
+                r={estado.r} catalogo={catalogo} accesosKey={accesos} terminologia={terminologia}
                 onRevocar={() => autorizar(estado.r.dni, false)} encabezadoRef={refEncabezado}
               />
             )}

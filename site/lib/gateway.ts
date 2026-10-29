@@ -42,6 +42,9 @@ export class ErrorApi extends Error {
   }
 }
 
+export interface Terminologia { version: string | null; items: Record<string, string> }
+let terminologia: Terminologia | null = null;
+
 const ahora = () => performance.now();
 const caidos = new Set<Clave>();
 
@@ -247,6 +250,19 @@ export const api = {
     registrar(dni, "Paciente (simulado)", "consentimiento", otorgado ? "otorgado" : "revocado");
   },
   accesos: (dni: string): Acceso[] => leer().accesos[dni] ?? [],
+  // Nombres oficiales LOINC desde el servicio de terminología de HL7. Si falla, devuelve vacío y el visor sigue igual.
+  async terminologia(): Promise<Terminologia> {
+    if (terminologia) return terminologia;
+    try {
+      const res = await fetch(`/api/terminologia?codigos=${Object.keys(CATALOGO).join(",")}`);
+      if (!res.ok) return { version: null, items: {} };
+      const t = (await res.json()) as Terminologia;
+      if (Object.keys(t.items).length) terminologia = t;
+      return t;
+    } catch {
+      return { version: null, items: {} };
+    }
+  },
   async pedirExamen(dni: string, codigo: string) {
     const r = await consultarHistorial(dni, "Dra. de demostración", `pedido de ${CATALOGO[codigo][0]}`);
     return evaluarPedido(r.examenes, codigo);

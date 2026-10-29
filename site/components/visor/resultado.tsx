@@ -4,7 +4,7 @@ import { useState, type RefObject } from "react";
 import {
   ArrowsClockwise, CheckCircle, CloudSlash, Copy, LockKey, LockKeyOpen, ShieldCheck, Warning,
 } from "@phosphor-icons/react";
-import { api, SISTEMAS, type Pedido, type Resumen } from "@/lib/gateway";
+import { api, SISTEMAS, type Pedido, type Resumen, type Terminologia } from "@/lib/gateway";
 import { Chip, btn, fecha, fechaHora, ms, panel } from "../ui";
 import { mensajeAlerta, sexo } from "../textos";
 
@@ -95,8 +95,8 @@ function PedirExamen({ dni, catalogo }: { dni: string; catalogo: { codigo: strin
 }
 
 export function ResultadoResumen({
-  r, catalogo, accesosKey, onRevocar, encabezadoRef,
-}: { r: Resumen; catalogo: { codigo: string; nombre: string }[]; accesosKey: number; onRevocar: () => void; encabezadoRef: RefObject<HTMLHeadingElement | null> }) {
+  r, catalogo, accesosKey, terminologia, onRevocar, encabezadoRef,
+}: { r: Resumen; catalogo: { codigo: string; nombre: string }[]; accesosKey: number; terminologia: Terminologia; onRevocar: () => void; encabezadoRef: RefObject<HTMLHeadingElement | null> }) {
   const dup = new Set(r.repetidos.flatMap((a) => [`${a.codigo}|${a.fechaAnterior}`, `${a.codigo}|${a.fechaRepeticion}`]));
   const caidos = r.establecimientos.filter((e) => e.estado === "no_disponible");
   const accesos = api.accesos(r.dni).slice(0, 6);
@@ -157,6 +157,7 @@ export function ResultadoResumen({
                     <td data-label="Examen" className="border-b border-line px-3 py-3">
                       {e.nombre}
                       {e.codigo && <span className="block font-mono text-[0.75rem] text-muted">LOINC {e.codigo}{e.codigoOriginal ? ` (código local ${e.codigoOriginal} traducido)` : ""}</span>}
+                      {e.codigo && terminologia.items[e.codigo] && <span className="block text-[0.75rem] text-muted">{terminologia.items[e.codigo]}</span>}
                       {rep && <span className="mt-1 inline-flex items-center gap-1 text-[0.78rem] font-semibold text-warn"><Copy size={14} aria-hidden /> Repetido</span>}
                     </td>
                     <td data-label="Resultado" className="border-b border-line px-3 py-3 tabular-nums">{e.resultado}</td>
@@ -200,6 +201,7 @@ export function ResultadoResumen({
           </table>
           <p className="mt-3 text-sm text-muted">
             {r.traza.examenes} exámenes unificados{r.traza.traducidos ? `, ${r.traza.traducidos} con código local traducido a LOINC` : ""}. Las consultas corren en paralelo: el tiempo total fue {ms(r.traza.total)}.
+            {terminologia.version && ` Nombres de los exámenes verificados en el servicio de terminología de HL7 (tx.fhir.org), LOINC ${terminologia.version}.`}
           </p>
         </details>
       </section>
