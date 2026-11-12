@@ -286,7 +286,7 @@ export function Historia({ r, paraPaciente = false }: { r: Resumen; paraPaciente
   ];
 
   return (
-    <article className="grid min-w-0 gap-5">
+    <article className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
       <header className={panel}>
         <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
           <h2 className="text-[1.45rem] font-semibold tracking-[-0.015em]">{r.nombre}</h2>
@@ -364,7 +364,7 @@ export function Historia({ r, paraPaciente = false }: { r: Resumen; paraPaciente
       </nav>
 
       {tab === "resumen" && (
-        <div className="grid gap-4">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
           <section className={panel}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h3 className="text-[0.98rem] font-semibold">
@@ -403,7 +403,7 @@ export function Historia({ r, paraPaciente = false }: { r: Resumen; paraPaciente
             )}
           </section>
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-3">
             <Seccion titulo="Condiciones" n={r.condiciones.length}>
               {r.condiciones.length ? (
                 <ul className="flex flex-col gap-2">
@@ -529,7 +529,7 @@ export function Historia({ r, paraPaciente = false }: { r: Resumen; paraPaciente
       )}
 
       {tab === "informes" && (
-        <div className="grid gap-4">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
           <div className="no-imprimir flex justify-end">
             <button type="button" className={`${btn.ghost} ${btn.sm}`} onClick={() => window.print()}>
               <Printer size={16} aria-hidden /> Imprimir
@@ -556,7 +556,7 @@ export function Historia({ r, paraPaciente = false }: { r: Resumen; paraPaciente
         <section className={panel}>
           <label className="flex flex-wrap items-center gap-3 text-[0.92rem] font-medium">
             ¿Qué examen piensa pedir?
-            <select className={control} value={codigoPedido} onChange={(e) => setCodigoPedido(e.target.value)}>
+            <select className={`${control} w-full min-w-0 sm:w-auto sm:max-w-full`} value={codigoPedido} onChange={(e) => setCodigoPedido(e.target.value)}>
               {Object.entries(EXAMENES).map(([codigo, info]) => (
                 <option key={codigo} value={codigo}>
                   {info.nombre}

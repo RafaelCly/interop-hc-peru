@@ -226,7 +226,7 @@ export function PortalMedico({ user }: { user: SafeUser }) {
           <>
             <Encabezado
               titulo={`Hola, ${user.nombre.split(" ").slice(0, 2).join(" ")}`}
-              bajada="Al abrir la historia de un paciente quedas como su médico tratante, hasta que él te retire el acceso. Para alguien sin cita, pídele el código que le llega por SMS."
+              bajada="Al abrir la historia de un paciente quedas como su médico tratante, hasta que el paciente te retire el acceso. Para alguien sin cita, pídele el código que le llega por SMS."
             />
             {msg && <AvisoOk>{msg}</AvisoOk>}
             {error && (
