@@ -28,7 +28,11 @@ export function PortalMedico({ user }: { user: SafeUser }) {
     [loading, setLoading] = useState(true),
     [historia, setHistoria] = useState<Resumen | null>(null),
     [seleccionado, setSeleccionado] = useState(""),
-    [omitir, setOmitir] = useState("");
+    [omitir, setOmitir] = useState(""),
+    [codigo, setCodigo] = useState(""),
+    [emDni, setEmDni] = useState(""),
+    [emMotivo, setEmMotivo] = useState(""),
+    [emAbierto, setEmAbierto] = useState(false);
   const recargar = useCallback(async () => {
     try {
       const [a, b] = await Promise.all([fetchPortal("solicitudes"), fetchPortal("auditoria")]);
@@ -108,6 +112,31 @@ export function PortalMedico({ user }: { user: SafeUser }) {
       setSending(false);
     }
   };
+  const abrirConAcceso = async (accion: "canjear-llave" | "emergencia", cuerpo: object) => {
+    setError("");
+    setMsg("");
+    setSending(true);
+    try {
+      const r = (await fetchPortal(accion, "POST", cuerpo)) as { dni: string; mensaje: string };
+      setMsg(r.mensaje);
+      setCodigo("");
+      setEmMotivo("");
+      setEmAbierto(false);
+      await recargar();
+      await ver(r.dni);
+    } catch (e) {
+      setError((e as Error).message);
+      setSending(false);
+    }
+  };
+  // Al escanear el QR del paciente con la cámara, el enlace trae el código y se canjea solo.
+  useEffect(() => {
+    const c = new URLSearchParams(window.location.search).get("llave");
+    if (!c) return;
+    window.history.replaceState(null, "", window.location.pathname);
+    void abrirConAcceso("canjear-llave", { codigo: c });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <PortalLayout
       user={user}
@@ -194,6 +223,86 @@ export function PortalMedico({ user }: { user: SafeUser }) {
                 {sending ? "Enviando..." : "Enviar solicitud al paciente"}
               </button>
             </form>
+            <div className="mt-5 grid gap-3 rounded-ctl border border-line p-3.5">
+              <p className="text-sm font-bold">Entrar con el código del paciente</p>
+              <p className="-mt-2 text-xs text-muted">
+                En consulta presencial, el paciente muestra su llave QR. Escanéala con la cámara o escribe el
+                código.
+              </p>
+              <form
+                className="flex flex-wrap items-end gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void abrirConAcceso("canjear-llave", { codigo });
+                }}
+              >
+                <label className="grid flex-1 gap-1 text-xs font-semibold">
+                  Código
+                  <input
+                    className="min-h-11 rounded-ctl border border-line bg-bg px-3 font-mono text-base uppercase tracking-widest"
+                    value={codigo}
+                    maxLength={9}
+                    placeholder="ABCD-2345"
+                    onChange={(e) => setCodigo(e.target.value)}
+                  />
+                </label>
+                <button type="submit" disabled={sending || codigo.replace(/\W/g, "").length < 8} className={btn.secondary}>
+                  Abrir historial
+                </button>
+              </form>
+            </div>
+            <div className="mt-3 rounded-ctl border border-danger-line bg-danger-bg p-3.5">
+              <button
+                type="button"
+                className="text-sm font-bold text-danger underline"
+                aria-expanded={emAbierto}
+                onClick={() => setEmAbierto(!emAbierto)}
+              >
+                Acceso de emergencia (paciente sin poder autorizar)
+              </button>
+              {emAbierto && (
+                <form
+                  className="mt-3 grid gap-3"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void abrirConAcceso("emergencia", { dni: emDni, motivo: emMotivo });
+                  }}
+                >
+                  <p className="text-xs text-ink">
+                    Solo si el paciente no puede autorizar. Dura 1 hora, queda registrado con tu nombre y se
+                    informa al paciente, que puede revocarlo.
+                  </p>
+                  <label className="grid gap-1 text-xs font-semibold text-ink">
+                    DNI del paciente
+                    <input
+                      className="min-h-11 rounded-ctl border border-line bg-bg px-3 text-base font-normal"
+                      inputMode="numeric"
+                      pattern="[0-9]{8}"
+                      maxLength={8}
+                      required
+                      value={emDni}
+                      onChange={(e) => setEmDni(e.target.value.replace(/\D/g, ""))}
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs font-semibold text-ink">
+                    Motivo de la emergencia
+                    <textarea
+                      className="rounded-ctl border border-line bg-bg p-3 text-base font-normal"
+                      rows={2}
+                      required
+                      minLength={15}
+                      maxLength={300}
+                      value={emMotivo}
+                      placeholder="Ej.: paciente inconsciente en emergencia, requiere antecedentes y alergias"
+                      onChange={(e) => setEmMotivo(e.target.value)}
+                    />
+                  </label>
+                  <button type="submit" disabled={sending} className={btn.primary}>
+                    Confirmar acceso de emergencia
+                  </button>
+                </form>
+              )}
+            </div>
             <div className="mt-5 rounded-ctl bg-surface-2 p-3 text-sm">
               <p className="font-bold">Cómo probar el circuito</p>
               <p className="mt-1 text-muted">
@@ -226,9 +335,13 @@ export function PortalMedico({ user }: { user: SafeUser }) {
                           <p className="text-sm font-bold">DNI ficticio {s.dni}</p>
                           <p className="text-xs text-muted">{s.paciente}</p>
                         </div>
-                        <Pill
-                          status={autorizado ? s.estado : s.estado === "aprobada" ? "Vencida" : s.estado}
-                        />
+                        <span className="flex items-center gap-2">
+                          {s.via === "qr" && <span className="text-xs font-semibold text-accent-strong">Llave QR</span>}
+                          {s.via === "emergencia" && <span className="text-xs font-semibold text-danger">Emergencia</span>}
+                          <Pill
+                            status={autorizado ? s.estado : s.estado === "aprobada" ? "Vencida" : s.estado}
+                          />
+                        </span>
                       </div>
                       <p className="mt-2 text-sm">{s.finalidad}</p>
                       <p className="mt-1 text-xs text-muted">

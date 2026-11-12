@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import QRCode from "qrcode";
 import type { SafeUser } from "@/lib/server/auth";
 import type { Resumen } from "@/lib/tipos";
 import { btn, panel } from "@/components/ui";
@@ -15,7 +16,12 @@ import {
   type EventView,
 } from "./shared";
 import { Historia } from "./historia";
-type View = "historia" | "permisos" | "auditoria";
+type View = "historia" | "permisos" | "llave" | "auditoria";
+interface LlaveVista {
+  codigo: string;
+  expira: string;
+  qr: string;
+}
 export function PortalPaciente({ user }: { user: SafeUser }) {
   const [view, setView] = useState<View>("historia"),
     [solicitudes, setSolicitudes] = useState<SolicitudView[]>([]),
@@ -24,7 +30,32 @@ export function PortalPaciente({ user }: { user: SafeUser }) {
     [loading, setLoading] = useState(true),
     [msg, setMsg] = useState(""),
     [error, setError] = useState(""),
-    [horas, setHoras] = useState(24);
+    [horas, setHoras] = useState(24),
+    [llave, setLlave] = useState<LlaveVista | null>(null),
+    [ahora, setAhora] = useState(() => Date.now());
+  useEffect(() => {
+    if (!llave) return;
+    const t = setInterval(() => setAhora(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [llave]);
+  const generarLlave = async () => {
+    setError("");
+    try {
+      const r = (await fetchPortal("crear-llave", "POST", {})) as { codigo: string; expira: string };
+      const qr = await QRCode.toDataURL(`${window.location.origin}/medico?llave=${r.codigo}`, {
+        margin: 1,
+        width: 320,
+        color: { dark: "#14213d", light: "#ffffff" },
+      });
+      setLlave({ ...r, qr });
+      setAhora(Date.parse(r.expira) - 5 * 60_000);
+      await recargar();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+  const restante = llave ? Math.max(0, Math.round((Date.parse(llave.expira) - ahora) / 1000)) : 0;
+  const emergencias = solicitudes.filter((s) => s.via === "emergencia" && s.estado === "aprobada");
   const recargar = useCallback(async () => {
     try {
       const [a, b] = await Promise.all([fetchPortal("solicitudes"), fetchPortal("auditoria")]);
@@ -91,6 +122,7 @@ export function PortalPaciente({ user }: { user: SafeUser }) {
             k: "permisos",
             t: `Autorizaciones (${solicitudes.filter((s) => s.estado === "pendiente").length})`,
           },
+          { k: "llave", t: "Mi llave QR" },
           { k: "auditoria", t: "Quién accedió" },
         ].map((x) => (
           <button
@@ -113,6 +145,46 @@ export function PortalPaciente({ user }: { user: SafeUser }) {
         <div className="mb-4">
           <ErrorBlock mensaje={error} />
         </div>
+      )}
+      {emergencias.length > 0 && (
+        <div role="alert" className="mb-4 rounded-ctl border-2 border-danger bg-danger-bg px-4 py-3 text-sm text-ink">
+          <strong className="text-danger">Acceso de emergencia a tu historial.</strong>{" "}
+          {emergencias.map((s) => `${s.doctor} (${dateTime(s.creada)}): ${s.finalidad.replace("EMERGENCIA: ", "")}`).join(" · ")}
+          . Si no lo reconoces, revócalo en Autorizaciones.
+        </div>
+      )}
+      {view === "llave" && (
+        <section className={panel}>
+          <h2 className="text-xl font-bold">Mi llave QR</h2>
+          <p className="mt-2 max-w-2xl text-sm text-muted">
+            Para una consulta presencial, muestra este código al médico. Al escanearlo, abre tu historial por 1
+            hora sin que tengas que aprobar una solicitud. El código sirve una sola vez y vence en 5 minutos.
+          </p>
+          <button type="button" className={`${btn.primary} mt-4`} onClick={() => void generarLlave()}>
+            {llave ? "Generar otro código" : "Generar mi llave QR"}
+          </button>
+          {llave && (
+            <div className="mt-5 flex flex-wrap items-center gap-6">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={llave.qr}
+                alt={`Código QR de acceso. Código manual ${llave.codigo}`}
+                width={220}
+                height={220}
+                className="rounded-card border border-line bg-white p-2"
+              />
+              <div>
+                <p className="text-xs font-semibold uppercase text-muted">Código manual</p>
+                <p className="mt-1 font-mono text-3xl font-bold tracking-widest">{llave.codigo}</p>
+                <p className="mt-3 text-sm" role="status">
+                  {restante > 0
+                    ? `Vence en ${Math.floor(restante / 60)}:${String(restante % 60).padStart(2, "0")}`
+                    : "El código venció. Genera uno nuevo."}
+                </p>
+              </div>
+            </div>
+          )}
+        </section>
       )}
       {view === "historia" &&
         (loading ? (
@@ -154,7 +226,19 @@ export function PortalPaciente({ user }: { user: SafeUser }) {
               <article key={s.id} className="rounded-ctl border border-line p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
-                    <p className="font-semibold">{s.doctor}</p>
+                    <p className="font-semibold">
+                      {s.doctor}
+                      {s.via === "qr" && (
+                        <span className="ml-2 rounded-full bg-accent-soft px-2 py-0.5 text-xs text-accent-strong">
+                          Con tu llave QR
+                        </span>
+                      )}
+                      {s.via === "emergencia" && (
+                        <span className="ml-2 rounded-full bg-danger-bg px-2 py-0.5 text-xs text-danger">
+                          Acceso de emergencia
+                        </span>
+                      )}
+                    </p>
                     <p className="mt-1 text-xs text-muted">Solicitada el {dateTime(s.creada)}</p>
                   </div>
                   <Pill

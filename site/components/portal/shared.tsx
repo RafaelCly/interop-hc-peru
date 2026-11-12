@@ -13,6 +13,7 @@ export type SolicitudView = {
   creada: string;
   decidida?: string;
   expira?: string;
+  via?: "solicitud" | "qr" | "emergencia";
   doctor: string;
   paciente: string;
 };

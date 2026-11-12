@@ -76,6 +76,18 @@ export interface Atencion {
   seguimiento: string;
 }
 
+// Una alergia documentada que choca con un medicamento registrado, en la misma sede o en otra.
+export interface AlertaSeguridad {
+  alergia: string;
+  reaccion: string;
+  medicamento: string;
+  relacion: string;
+  lugarAlergia: string;
+  lugarMedicamento: string;
+  entreSedes: boolean;
+  vigente: boolean;
+}
+
 export interface Resumen {
   dni: string;
   nombre: string;
@@ -87,6 +99,7 @@ export interface Resumen {
   medicamentos: { nombre: string; fuentes: Fuente[] }[];
   examenes: Examen[];
   repetidos: Alerta[];
+  seguridad: AlertaSeguridad[];
   atenciones: Atencion[];
   traza: { total: number; sistemas: TrazaSistema[]; examenes: number; traducidos: number };
 }

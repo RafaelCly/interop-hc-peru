@@ -93,9 +93,53 @@ async function probar() {
     false,
   );
 
+  // Alerta de seguridad entre sedes: alergia en una sede, medicamento de la misma clase en otra
+  assert.ok(
+    resumen.seguridad.some(
+      (y) => /penicilina/i.test(y.alergia) && /amoxicilina/i.test(y.medicamento) && y.entreSedes,
+    ),
+  );
+  assert.equal(c.clinicalSummary("90000004").seguridad.length, 0);
+  const sulfas = require("./lib/seguridad.ts").cruzarAlergias({
+    alergias: [{ sustancia: "Sulfas", reaccion: "Prurito", fuentes: [{ clave: "essalud", lugar: "E" }] }],
+    medicamentos: [{ nombre: "Sulfato ferroso 300 mg", fuentes: [{ clave: "essalud", lugar: "E", estado: "active" }] }],
+  });
+  assert.equal(sulfas.length, 0, "sulfato ferroso no es una sulfonamida");
+  // Resumen para la consulta: lo crítico va primero y el motivo resalta lo relacionado
+  const r1 = require("./lib/resumen-consulta.ts").resumenConsulta(resumen, "cansancio y azúcar alta");
+  assert.equal(r1[0].nivel, "critico");
+  assert.ok(r1.some((y) => y.relevante && /glucosa|hemoglobina/i.test(y.titulo)));
+  assert.ok(r1.every((y) => y.fuente));
+
+  // Llave QR: un solo uso, vence y da una hora de acceso
+  const s0 = await a.readState();
+  const pac = s0.users.find((u) => u.dni === "90000002");
+  const l1 = await a.crearLlave(pac);
+  assert.match(l1.codigo, /^[A-Z0-9]{4}-[A-Z0-9]{4}$/);
+  await assert.rejects(() => a.canjearLlave(doc, "ZZZZ-9999"), /no es válido/);
+  const ok = await a.canjearLlave(doc, l1.codigo.toLowerCase());
+  assert.equal(ok.dni, "90000002");
+  assert.ok(a.hasPermission(await a.readState(), doc, "90000002"));
+  await assert.rejects(() => a.canjearLlave(doc2, l1.codigo), /no es válido/);
+  assert.ok(!a.hasPermission(await a.readState(), doc2, "90000002"));
+  const evq = await a.userEvents(pac);
+  assert.ok(evq.some((e) => e.accion === "acceso_por_llave"));
+  await assert.rejects(() => a.crearLlave(doc), /Sin permiso/);
+
+  // Acceso de emergencia: sin permiso previo, queda registrado y el paciente lo ve
+  const pac3 = s0.users.find((u) => u.dni === "90000003");
+  assert.ok(!a.hasPermission(await a.readState(), doc2, "90000003"));
+  await assert.rejects(() => a.accesoEmergencia(doc2, "90000003", "corto"), undefined);
+  await a.accesoEmergencia(doc2, "90000003", "Paciente inconsciente, se requieren alergias");
+  assert.ok(a.hasPermission(await a.readState(), doc2, "90000003"));
+  assert.ok((await a.userEvents(pac3)).some((e) => e.accion === "acceso_emergencia"));
+  assert.equal((await a.userRequests(pac3))[0].via, "emergencia");
+  await a.decide(pac3, (await a.userRequests(pac3))[0].id, "revocar");
+  assert.ok(!a.hasPermission(await a.readState(), doc2, "90000003"));
+
   console.log(
     `OK V2 (almacén ${tipoAlmacen}): 2 médicos, 24 pacientes; login, aislamiento, permisos, revocación, ` +
-      `auditoría, ${resumen.atenciones.length} atenciones, ${resumen.examenes.length} resultados y caída parcial.`,
+      `auditoría, alertas de seguridad, llave QR, emergencia, ${resumen.atenciones.length} atenciones, ${resumen.examenes.length} resultados y caída parcial.`,
   );
 }
 

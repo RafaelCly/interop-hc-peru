@@ -276,7 +276,7 @@ export const CASOS = [
     consentimiento: true,
     sistemas: ["minsa", "essalud"],
     titulo: "Dos sistemas, dos repeticiones",
-    muestra: "Repite HbA1c y glucosa entre Minsa y EsSalud. Una alergia solo consta en un sistema.",
+    muestra: "Repite HbA1c y glucosa entre Minsa y EsSalud. Alergia a la penicilina en Minsa y amoxicilina recetada en EsSalud.",
     condiciones: [
       ["E11", "Diabetes mellitus tipo 2"],
       ["I10", "Hipertensión esencial"],
@@ -286,6 +286,7 @@ export const CASOS = [
       ["minsa", "Metformina 850 mg c/12 h"],
       ["essalud", "Metformina 850 mg c/12 h"],
       ["essalud", "Enalapril 10 mg c/24 h"],
+      ["essalud", "Amoxicilina 500 mg c/8 h"],
     ],
     examenes: [
       ["4548-4", 12, "essalud"],
@@ -304,12 +305,13 @@ export const CASOS = [
     consentimiento: true,
     sistemas: ["minsa", "clinica"],
     titulo: "Pedir un examen que ya existe",
-    muestra: "Un ECG reciente en la clínica. Al intentar pedir otro, el visor avisa del duplicado.",
+    muestra: "Un ECG reciente en la clínica. Alergia a la aspirina en Minsa y ácido acetilsalicílico recetado en la clínica.",
     condiciones: [["I10", "Hipertensión esencial"]],
     alergias: [["minsa", "Aspirina", "Urticaria"]],
     medicamentos: [
       ["minsa", "Losartán 50 mg c/24 h"],
       ["clinica", "Losartán 50 mg c/24 h"],
+      ["clinica", "Ácido acetilsalicílico 100 mg c/24 h"],
     ],
     examenes: [
       ["11524-6", 9, "clinica"],

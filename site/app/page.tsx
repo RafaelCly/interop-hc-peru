@@ -1,5 +1,15 @@
 import Link from "next/link";
-import { ArrowRight, Copy, GitMerge, PlugsConnected, ShieldCheck } from "@phosphor-icons/react/dist/ssr";
+import {
+  ArrowRight,
+  Copy,
+  FirstAidKit,
+  GitMerge,
+  ListChecks,
+  PlugsConnected,
+  QrCode,
+  ShieldCheck,
+  Warning,
+} from "@phosphor-icons/react/dist/ssr";
 import { CASOS, type Clave } from "@/lib/data";
 import { HeroCard, type VistaPrevia } from "@/components/hero-card";
 import { Flujo } from "@/components/flujo";
@@ -9,6 +19,7 @@ import { EnPantalla } from "@/components/en-pantalla";
 import { Chip, btn, contenedor } from "@/components/ui";
 import { EcgVivo } from "@/components/ecg-vivo";
 import { clinicalSummary } from "@/lib/server/clinical";
+import { PACIENTES } from "@/lib/fhir-server";
 
 const LINKS = {
   dyer: "https://www.infobae.com/peru/2026/08/06/ministro-de-salud-luis-dyer-revela-que-archivos-del-minsa-aun-se-guardan-en-cd-estamos-en-el-ano-95/",
@@ -71,11 +82,50 @@ const funciones = [
     texto: "El paciente autoriza el acceso y queda registrado quién consultó su historial.",
   },
   {
+    icono: Warning,
+    titulo: "Alerta de seguridad entre sedes",
+    texto:
+      "Cruza las alergias de una sede con los medicamentos de otra y avisa de un choque, por ejemplo penicilina y amoxicilina.",
+  },
+  {
+    icono: ListChecks,
+    titulo: "Resumen para la consulta",
+    texto:
+      "Una pantalla con lo urgente primero y la fuente de cada dato. Se ajusta al motivo de consulta que escribe el médico.",
+  },
+  {
+    icono: QrCode,
+    titulo: "Llave QR del paciente",
+    texto:
+      "En consulta presencial, el paciente muestra un código de un solo uso y el médico entra una hora, sin esperar una solicitud.",
+  },
+  {
+    icono: FirstAidKit,
+    titulo: "Acceso de emergencia",
+    texto:
+      "Si el paciente no puede autorizar, el médico entra con un motivo obligatorio. Dura una hora, queda registrado y el paciente lo ve.",
+  },
+  {
     icono: PlugsConnected,
     titulo: "Sigue funcionando si un sistema cae",
     texto: "El visor muestra lo disponible y marca el historial como incompleto en lugar de fallar.",
   },
 ];
+
+// Qué detecta el prototipo sobre los 24 pacientes de prueba, calculado con las mismas reglas del portal.
+function impacto() {
+  let repetidos = 0,
+    seguridad = 0,
+    variasSedes = 0;
+  for (const p of PACIENTES) {
+    const r = clinicalSummary(p.dni);
+    if (!r) continue;
+    repetidos += r.repetidos.length;
+    seguridad += r.seguridad.length;
+    if (p.sistemas.length > 1) variasSedes++;
+  }
+  return { total: PACIENTES.length, repetidos, seguridad, variasSedes };
+}
 
 const casos = CASOS.filter((c) => c.titulo);
 
@@ -128,6 +178,7 @@ function vistaPrevia(): VistaPrevia | null {
 
 export default function Inicio() {
   const previa = vistaPrevia();
+  const imp = impacto();
   return (
     <>
       <div className="relative isolate overflow-hidden">
@@ -212,7 +263,7 @@ export default function Inicio() {
             Qué resuelve el prototipo
           </h2>
           <p className="mt-3 max-w-[34ch] text-muted">
-            Cuatro capacidades pensadas para el momento de la consulta.
+            Seis capacidades pensadas para el momento de la consulta.
           </p>
         </div>
         <ul className="divide-y divide-line border-y border-line">
@@ -225,6 +276,30 @@ export default function Inicio() {
                 <h3 className="text-[1.05rem] font-semibold">{titulo}</h3>
                 <p className="mt-1 max-w-[52ch] text-muted">{texto}</p>
               </div>
+            </li>
+          ))}
+        </ul>
+      </Reveal>
+
+      <Reveal as="section" className={`${contenedor} py-14 sm:py-20`}>
+        <h2 className="max-w-[28ch] text-[clamp(1.6rem,1.1rem+1.8vw,2.4rem)] font-semibold">
+          Lo que detecta sobre {imp.total} pacientes de prueba
+        </h2>
+        <p className="mt-3 max-w-[56ch] text-muted">
+          Conteo hecho con las mismas reglas del portal sobre datos simulados. Son casos de demostración, no
+          una medición en establecimientos reales.
+        </p>
+        <ul className="mt-10 grid gap-x-8 gap-y-10 sm:grid-cols-3">
+          {[
+            { v: imp.repetidos, t: "coincidencias de exámenes entre sedes, para revisar antes de pedirlos de nuevo" },
+            { v: imp.seguridad, t: "choques entre una alergia y un medicamento de otra sede" },
+            { v: imp.variasSedes, t: `pacientes con historia repartida en más de un sistema, de ${imp.total}` },
+          ].map((x) => (
+            <li key={x.t} className="border-t-2 border-accent pt-4">
+              <p className="text-[clamp(2.4rem,2rem+1.6vw,3.4rem)] font-bold leading-none tracking-tight">
+                <CountUp valor={x.v} decimales={0} />
+              </p>
+              <p className="mt-3 text-[0.95rem] text-muted">{x.t}</p>
             </li>
           ))}
         </ul>

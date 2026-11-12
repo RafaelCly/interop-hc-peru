@@ -2,6 +2,7 @@ import "server-only";
 import { stores } from "@/lib/fhir-server";
 import { SISTEMAS, CATALOGO, LOINC, CLINICA_LOCAL, LOCAL_A_LOINC, type Clave } from "@/lib/data";
 import { EXAMENES, interpretarResultado } from "@/lib/catalogo-clinico";
+import { cruzarAlergias } from "@/lib/seguridad";
 import type { Resumen, Atencion, Examen, Alerta, Fuente } from "@/lib/tipos";
 
 const keys: Clave[] = ["minsa", "essalud", "clinica"];
@@ -172,6 +173,8 @@ export function clinicalSummary(dni: string, omitir?: Clave): Resumen | null {
   }
   atenciones.sort((a, b) => b.fechaHora.localeCompare(a.fechaHora));
   examenes.sort((a, b) => b.fecha.localeCompare(a.fecha));
+  const alergiasLista = [...alergias.values()],
+    medicamentosLista = [...meds.values()];
   return {
     dni,
     nombre: `${principal.name[0].given.join(" ")} ${principal.name[0].family}`,
@@ -185,11 +188,12 @@ export function clinicalSummary(dni: string, omitir?: Clave): Resumen | null {
         estado: m.k === omitir ? "no_disponible" : m.patient ? "ok" : "sin_registro",
       })),
     condiciones: [...condiciones.values()],
-    alergias: [...alergias.values()],
-    medicamentos: [...meds.values()],
+    alergias: alergiasLista,
+    medicamentos: medicamentosLista,
     examenes,
     atenciones,
     repetidos: alertasPrevias(examenes),
+    seguridad: cruzarAlergias({ alergias: alergiasLista, medicamentos: medicamentosLista }),
     traza: {
       total: 0,
       sistemas: matches.map((m) => ({

@@ -30,6 +30,15 @@ export interface Solicitud {
   creada: string;
   decidida?: string;
   expira?: string;
+  // Cómo se originó el permiso: solicitud del médico, llave QR del paciente o acceso de emergencia.
+  via?: "solicitud" | "qr" | "emergencia";
+}
+// Código de un solo uso que el paciente muestra (como QR) para abrir su historial al médico que tiene delante.
+export interface Llave {
+  hash: string;
+  patientId: string;
+  expira: number;
+  usada?: boolean;
 }
 export interface Evento {
   id: string;
@@ -50,6 +59,7 @@ interface State {
   sessions: Session[];
   solicitudes: Solicitud[];
   eventos: Evento[];
+  llaves?: Llave[];
 }
 const KEY = "sjl_session";
 const hashToken = (raw: string) => createHash("sha256").update(raw).digest("hex");
@@ -57,6 +67,7 @@ const senha = (pass: string, salt: string) => scryptSync(pass, salt, 64).toStrin
 const iso = () => new Date().toISOString();
 const limpiar = (s: State) => {
   s.sessions = s.sessions.filter((x) => x.expira > Date.now());
+  s.llaves = (s.llaves ?? []).filter((x) => x.expira > Date.now() && !x.usada);
 };
 function seed(): State {
   const make = (
@@ -94,7 +105,7 @@ function seed(): State {
       ),
     ),
   );
-  return { users, sessions: [], solicitudes: [], eventos: [] };
+  return { users, sessions: [], solicitudes: [], eventos: [], llaves: [] };
 }
 export async function readState(): Promise<State> {
   const raw = await leerEstado();
@@ -254,6 +265,85 @@ export async function requestAccess(doctor: DemoUser, dni: string, finalidad: st
   addEvent(s, doctor.id, "solicitud_creada", `Solicitud de acceso · ${finalidad}`, patient.id, x.id);
   await writeState(s);
   return "Solicitud enviada al portal del paciente ficticio.";
+}
+const ALFABETO = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+const normalizarCodigo = (c: string) => c.toUpperCase().replace(/[^A-Z0-9]/g, "");
+const MIN_LLAVE = 5;
+const unaHora = () => new Date(Date.now() + 3600_000).toISOString();
+export async function crearLlave(patient: DemoUser): Promise<{ codigo: string; expira: string }> {
+  if (patient.role !== "paciente") throw Error("Sin permiso");
+  const s = await readState();
+  const bytes = randomBytes(8);
+  const crudo = Array.from(bytes, (b) => ALFABETO[b % ALFABETO.length]).join("");
+  s.llaves = (s.llaves ?? []).filter((x) => x.patientId !== patient.id);
+  const expira = Date.now() + MIN_LLAVE * 60_000;
+  s.llaves.push({ hash: hashToken(crudo), patientId: patient.id, expira });
+  addEvent(s, patient.id, "llave_creada", `Llave de acceso creada, vence en ${MIN_LLAVE} minutos`, patient.id);
+  await writeState(s);
+  return { codigo: `${crudo.slice(0, 4)}-${crudo.slice(4)}`, expira: new Date(expira).toISOString() };
+}
+export async function canjearLlave(doctor: DemoUser, codigo: string): Promise<{ dni: string; mensaje: string }> {
+  if (doctor.role !== "medico") throw Error("Sin permiso");
+  const s = await readState();
+  const fallos = s.eventos.filter(
+    (e) => e.actorId === doctor.id && e.accion === "llave_invalida" && Date.now() - Date.parse(e.cuando) < 10 * 60_000,
+  );
+  if (fallos.length >= 5) throw Error("Demasiados intentos con códigos inválidos. Espere unos minutos.");
+  const crudo = normalizarCodigo(codigo);
+  const llave = crudo.length === 8 ? (s.llaves ?? []).find((x) => x.hash === hashToken(crudo)) : undefined;
+  if (!llave) {
+    addEvent(s, doctor.id, "llave_invalida", "Código de acceso inválido o vencido");
+    await writeState(s);
+    throw Error("El código no es válido o ya venció. Pida al paciente que genere uno nuevo.");
+  }
+  const paciente = s.users.find((u) => u.id === llave.patientId)!;
+  llave.usada = true;
+  const x: Solicitud = {
+    id: randomBytes(12).toString("hex"),
+    doctorId: doctor.id,
+    patientId: paciente.id,
+    dni: paciente.dni!,
+    finalidad: "Acceso entregado por el paciente con su llave QR",
+    estado: "aprobada",
+    creada: iso(),
+    decidida: iso(),
+    expira: unaHora(),
+    via: "qr",
+  };
+  s.solicitudes.unshift(x);
+  addEvent(s, doctor.id, "acceso_por_llave", "Acceso por llave QR del paciente, vigente 1 hora", paciente.id, x.id);
+  await writeState(s);
+  return { dni: paciente.dni!, mensaje: "Acceso autorizado por el paciente durante 1 hora." };
+}
+export async function accesoEmergencia(
+  doctor: DemoUser,
+  dni: string,
+  motivo: string,
+): Promise<{ dni: string; mensaje: string }> {
+  if (doctor.role !== "medico") throw Error("Sin permiso");
+  if (motivo.trim().length < 15) throw Error("Describa el motivo de la emergencia (mínimo 15 caracteres).");
+  const s = await readState();
+  const paciente = s.users.find((u) => u.role === "paciente" && u.dni === dni);
+  if (!paciente) throw Error("No hay un paciente de demostración con ese documento.");
+  const hoy = iso().slice(0, 10);
+  if (s.solicitudes.filter((x) => x.doctorId === doctor.id && x.via === "emergencia" && x.creada.slice(0, 10) === hoy).length >= 3)
+    throw Error("Límite diario de accesos de emergencia alcanzado.");
+  const x: Solicitud = {
+    id: randomBytes(12).toString("hex"),
+    doctorId: doctor.id,
+    patientId: paciente.id,
+    dni,
+    finalidad: `EMERGENCIA: ${motivo}`,
+    estado: "aprobada",
+    creada: iso(),
+    decidida: iso(),
+    expira: unaHora(),
+    via: "emergencia",
+  };
+  s.solicitudes.unshift(x);
+  addEvent(s, doctor.id, "acceso_emergencia", `Acceso de emergencia sin autorización previa · ${motivo}`, paciente.id, x.id);
+  await writeState(s);
+  return { dni, mensaje: "Acceso de emergencia por 1 hora. Quedó registrado y el paciente será informado." };
 }
 export async function decide(
   patient: DemoUser,

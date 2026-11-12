@@ -1,7 +1,8 @@
 "use client";
 import { useMemo, useState } from "react";
 import type { Resumen, Atencion, Examen } from "@/lib/tipos";
-import { Warning } from "@phosphor-icons/react";
+import { Warning, ListChecks } from "@phosphor-icons/react";
+import { resumenConsulta } from "@/lib/resumen-consulta";
 import { btn, panel } from "@/components/ui";
 import { dateOnly, dateTime, useTerminologia } from "./shared";
 import { EXAMENES } from "@/lib/catalogo-clinico";
@@ -150,7 +151,9 @@ export function Historia({ r, paraPaciente = false }: { r: Resumen; paraPaciente
     [buscar, setBuscar] = useState(""),
     [periodo, setPeriodo] = useState("all"),
     [sede, setSede] = useState("all"),
-    [tipo, setTipo] = useState("all");
+    [tipo, setTipo] = useState("all"),
+    [motivo, setMotivo] = useState("");
+  const puntos = useMemo(() => resumenConsulta(r, motivo), [r, motivo]);
   const sedes = useMemo(
     () => [...new Set(r.atenciones.map((a) => a.establecimiento))].sort(),
     [r.atenciones],
@@ -231,6 +234,26 @@ export function Historia({ r, paraPaciente = false }: { r: Resumen; paraPaciente
             <span className="text-sm font-semibold">{r.alergias.map((a) => a.sustancia).join(", ")}</span>
           </div>
         )}
+        {r.seguridad.length > 0 && (
+          <div role="alert" className="mt-4 rounded-ctl border-2 border-danger bg-danger-bg px-4 py-3 text-danger">
+            <p className="inline-flex items-center gap-2 text-sm font-bold">
+              <Warning size={18} weight="fill" aria-hidden /> Alerta de seguridad entre sedes
+            </p>
+            <ul className="mt-2 grid gap-2">
+              {r.seguridad.map((s, i) => (
+                <li key={i} className="text-sm text-ink">
+                  <strong>
+                    Alergia a {s.alergia} y {s.medicamento}
+                  </strong>{" "}
+                  ({s.relacion}). Alergia en {s.lugarAlergia}; medicamento en {s.lugarMedicamento}
+                  {s.entreSedes ? ", otra sede" : ""}.{" "}
+                  {s.vigente ? "Figura como activo." : "Figura como finalizado."} Confirmar con el paciente antes
+                  de indicar.
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="mt-4 grid gap-2 sm:grid-cols-4">
           {[
             { n: r.atenciones.length, t: "Atenciones" },
@@ -265,6 +288,56 @@ export function Historia({ r, paraPaciente = false }: { r: Resumen; paraPaciente
       </nav>
       {tab === "resumen" && (
         <div className="grid gap-4 lg:grid-cols-2">
+          <section className={`${panel} lg:col-span-2`} aria-labelledby="resumen-consulta">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 id="resumen-consulta" className="inline-flex items-center gap-2 text-lg font-bold">
+                  <ListChecks size={20} aria-hidden /> {paraPaciente ? "Lo más importante de tu historial" : "Resumen para la consulta"}
+                </h3>
+                <p className="mt-1 max-w-2xl text-xs text-muted">
+                  Lo urgente primero. Cada punto indica la sede que lo registró. Se arma con reglas sobre los
+                  datos autorizados; no diagnostica ni reemplaza la revisión del expediente.
+                </p>
+              </div>
+              {!paraPaciente && (
+                <label className="grid min-w-64 gap-1 text-xs font-semibold">
+                  Motivo de la consulta (opcional)
+                  <input
+                    className={cls}
+                    placeholder="Ej.: dolor de pecho, cansancio, azúcar alta"
+                    value={motivo}
+                    maxLength={120}
+                    onChange={(e) => setMotivo(e.target.value)}
+                  />
+                </label>
+              )}
+            </div>
+            <ul className="mt-4 grid gap-2 lg:grid-cols-2">
+              {puntos.map((p) => (
+                <li
+                  key={p.id}
+                  className={`rounded-ctl border p-3 ${
+                    p.nivel === "critico"
+                      ? "border-danger-line bg-danger-bg"
+                      : p.nivel === "atencion"
+                        ? "border-warn-line bg-warn-bg"
+                        : "border-line bg-surface"
+                  }`}
+                >
+                  <p className="text-sm font-semibold">
+                    {p.titulo}
+                    {p.relevante && motivo.trim() && p.nivel === "info" && (
+                      <span className="ml-2 rounded-full bg-accent-soft px-2 py-0.5 text-xs text-accent-strong">
+                        Relacionado con el motivo
+                      </span>
+                    )}
+                  </p>
+                  <p className="mt-1 text-sm text-muted">{p.detalle}</p>
+                  <p className="mt-1 text-xs text-muted">Fuente: {p.fuente}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
           <section className={panel}>
             <h3 className="text-lg font-bold">Alergias documentadas</h3>
             <div className="mt-3 grid gap-2">

@@ -12,6 +12,9 @@ import {
   userEvents,
   registerAccess,
   hasPermission,
+  crearLlave,
+  canjearLlave,
+  accesoEmergencia,
   checkOrigin,
 } from "@/lib/server/auth";
 import { clinicalSummary, catalogoExamenes } from "@/lib/server/clinical";
@@ -121,6 +124,28 @@ async function manejarPost(req: NextRequest, c: Contexto) {
         return bad("Decisión incorrecta.");
       await decide(u, body.id, body.accion, Number(body.horas ?? 24));
       return response({ ok: true });
+    }
+    if (action === "crear-llave") {
+      if (u.role !== "paciente") return forbidden();
+      return response(await crearLlave(u));
+    }
+    if (action === "canjear-llave") {
+      if (u.role !== "medico") return forbidden();
+      if (!body || typeof body.codigo !== "string" || body.codigo.length > 20) return bad("Ingrese el código.");
+      return response(await canjearLlave(u, body.codigo));
+    }
+    if (action === "emergencia") {
+      if (u.role !== "medico") return forbidden();
+      if (
+        !body ||
+        typeof body.dni !== "string" ||
+        !/^[0-9]{8}$/.test(body.dni) ||
+        typeof body.motivo !== "string" ||
+        body.motivo.trim().length < 15 ||
+        body.motivo.length > 300
+      )
+        return bad("Ingrese el DNI y el motivo de la emergencia (mínimo 15 caracteres).");
+      return response(await accesoEmergencia(u, body.dni, body.motivo.trim()));
     }
     return response({ error: "No encontrado." }, 404);
   } catch (e) {
