@@ -17,7 +17,7 @@ npm ci
 npm run dev
 ```
 
-Abrir <http://localhost:3000/ingresar>.
+Abrir <http://localhost:3000>: la raíz es el ingreso. La interfaz se presenta como **Kipu**, el nombre del producto.
 
 ## Usuarios de prueba
 
@@ -29,21 +29,27 @@ Abrir <http://localhost:3000/ingresar>.
 | Paciente 2 | DNI 90000002 | `paciente02@demo.sjl.test` | `DemoPaciente2026!` |
 
 Hay 24 cuentas de pacientes: `paciente01` a `paciente24`, con DNI `90000001` a `90000024` y la misma contraseña de
-demostración. En el ingreso, los botones **Soy médico** y **Soy paciente** cargan el primer usuario de cada perfil.
+demostración. El ingreso no muestra ni rellena credenciales: hay que escribirlas.
 Estas credenciales son públicas y no protegen información real.
 
 ## Recorrido para la exposición
 
-1. Entrar como médica (`CMP-DEMO-001`).
-2. En **Solicitudes de acceso**, dejar el DNI `90000001` y pulsar **Enviar solicitud al paciente**. Cerrar sesión.
-3. Entrar como paciente `90000001`. En **Autorizaciones**, elegir la duración (1 hora, 24 horas o 7 días) y pulsar
-   **Autorizar**. Cerrar sesión.
-4. Entrar de nuevo como médica y pulsar **Actualizar**. Abrir **Visor clínico** y consultar el DNI autorizado.
-   Recorrer **Resumen**, **Atenciones**, **Exámenes**, **Tratamientos**, **Informes** y **Examen previo**.
-5. En **Simular fuente caída**, elegir un sistema y volver a consultar: el historial se marca como incompleto.
-6. Volver como paciente: **Quién accedió** muestra la consulta, y **Revocar permiso** retira el acceso.
-7. Como médica, una nueva consulta del mismo paciente es rechazada. Si había una vista abierta, se oculta en la
-   siguiente verificación (al volver a enfocar la pestaña o cada 15 s). Esto no puede borrar información ya vista.
+1. Entrar como médica (`CMP-DEMO-001`). **Mis pacientes** muestra sus **Citas de hoy** (la agenda que en producción
+   registra admisión). Pulsar **Abrir historia** en la cita de las 08:00: se abre sin pedir nada al paciente, solo
+   para la médica de esa cita y solo hasta el fin del día. Recorrer **Resumen**, **Atenciones**, **Exámenes**,
+   **Medicamentos**, **Informes** y **Antes de pedir un examen**.
+2. Paciente sin cita: en **Código por SMS**, escribir el DNI `90000009` y pulsar **Enviar**. En otra ventana, entrar
+   como paciente `90000009`: en **Autorizaciones** aparece el SMS con el código de seis dígitos. Escribirlo en el
+   portal de la médica y pulsar **Abrir** (acceso de una hora, un solo uso, cinco intentos como máximo).
+3. Como paciente `90000001`, en **Autorizaciones**, la cita figura como acceso activo **En tu cita** y se puede
+   **Retirar permiso**. El interruptor **Durante tus citas** desactiva este acceso: desde entonces la médica ve
+   "Pide autorizar en cada consulta" y debe usar el código SMS.
+4. **Quién vio mi historia** muestra cada apertura, con el canal usado.
+5. Siguen disponibles **Pedir acceso a distancia** (el paciente lo aprueba desde su cuenta, útil antes de una
+   interconsulta) y el **Acceso de emergencia**. Sin internet, el enlace **¿Sin internet? Leer el carné QR** abre el
+   lector del carné firmado. La llave QR de consulta se retiró: la cita y el código SMS cubren ese caso.
+6. Si se retira un permiso con la historia abierta, se oculta en la siguiente verificación (al volver a enfocar la
+   pestaña o cada 15 s). Esto no puede borrar información ya vista.
 
 ## Qué está implementado
 
@@ -54,6 +60,11 @@ Estas credenciales son públicas y no protegen información real.
   producción. Límite de 5 intentos fallidos por cuenta (bloqueo de 15 minutos) y validación de `Origin` en los POST.
 - Acceso a un expediente solo por el propio paciente o por el médico destinatario de una autorización vigente,
   comprobado en cada consulta.
+- Acceso durante la cita: el médico de una cita del día abre la historia sin pasos extra; vence al terminar el día.
+  Se basa en un consentimiento que el paciente da una vez y puede desactivar, y cada acceso se puede retirar.
+- Código por SMS de seis dígitos para pacientes sin cita o sin smartphone: vence en 10 minutos, sirve una vez, se
+  invalida tras cinco intentos y queda en la bitácora. El envío real requiere un proveedor de SMS; en el prototipo el
+  mensaje aparece en la cuenta del paciente.
 - Solicitudes, aprobación, rechazo, vencimiento y revocación, con duración definida y bitácora de eventos.
 - 24 pacientes sintéticos, 32 sedes referenciales de SJL, 113 atenciones, 144 resultados y un catálogo de 21 tipos
   de examen, cuyos códigos LOINC están verificados contra el servicio de terminología de HL7.
@@ -67,6 +78,27 @@ Estas credenciales son públicas y no protegen información real.
 - Recursos FHIR R4 sintéticos internos (`Encounter`, `Observation`, `DiagnosticReport`, `MedicationStatement`,
   `AllergyIntolerance`, `Condition`) y normalización de códigos locales a LOINC.
 - No hay endpoints clínicos públicos: los sistemas simulados solo los lee el servidor.
+
+## MVP2: carné sin conexión y resultados aportados por el paciente
+
+- **Carné QR sin conexión** (portal del paciente, «Mi carné sin conexión»): el resumen (alergias, condiciones,
+  medicamentos vigentes y últimos exámenes) va dentro del QR, firmado con ECDSA P-256 (`lib/carnet.ts`). Vence a
+  los 30 días. No cifra: quien lo escanee puede leerlo.
+- **Lector del médico** (`/leer`): escanea con la cámara, desde una foto o pegando el código; verifica la firma en
+  el navegador y cruza alergias con medicamentos. Un trabajador de servicio (`public/sw.js`) guarda la página y la
+  clave pública, así que funciona sin internet después de abrirla una vez con conexión. Esa lectura no queda en la
+  bitácora, porque ocurre fuera de línea.
+- **Digitalizar resultado** (portal del paciente): la foto de un resultado en papel se lee con IA
+  (`lib/server/digitalizar.ts`, modelo `claude-opus-5-5`, salida JSON con esquema). El código LOINC solo puede ser
+  uno del catálogo ya verificado. El paciente no escribe ni corrige valores: confirma que la lectura coincide con su papel (puede quitar un examen) o la descarta. Lo guardado sale siempre de la lectura, y cada descarte queda en el registro para medir la calidad de la IA.
+  Cada imagen se lee una vez (se guarda el resultado por el hash, no la imagen) y hay un límite de 10 lecturas por
+  día. Los resultados quedan marcados «aportados por el paciente» y separados de los de las redes. Hay dos
+  resultados ficticios de ejemplo en `public/demo/`.
+
+| Variable | Para qué | Si falta |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Lectura de fotos con IA | El botón «Leer con IA» avisa que no está configurada; no hay ingreso a mano |
+| `QR_FIRMA_JWK` | Clave privada P-256 (JWK) con que se firman los carnés | Se genera una y se guarda en el almacén del portal |
 
 ## Dónde se guarda el estado
 
@@ -90,6 +122,7 @@ entornos **Production y Preview** y volver a desplegar. Las variables se crean s
 |---|---|---|
 | CMP y habilitación del médico | Campo CMP-DEMO y profesionales ficticios preaprovisionados; **no** se consulta el CMP | Validación oficial autorizada, vínculo laboral y recertificación |
 | Identidad del paciente | Cuentas sintéticas preaprovisionadas con DNI, correo y contraseña | Acreditación oficial, verificación de contacto, recuperación de cuenta, MFA y representación legal |
+| Agenda y SMS | Agenda de ejemplo generada cada día; el SMS se muestra en la cuenta del paciente | Integración con el sistema de admisión de cada sede y un proveedor de SMS con número verificado del paciente |
 | Persistencia | Un documento JSON (archivo local o Redis) | PostgreSQL transaccional, concurrencia, copias de seguridad, registros inmutables y gestión de llaves |
 | Autenticación | Hash scrypt y sesiones HttpOnly; **sin** MFA ni recuperación de cuenta | MFA, rotación de secretos, política de riesgo y proveedor de identidad |
 | Integraciones | Tres redes de datos ficticios generadas en la misma aplicación | APIs autorizadas, autenticación mutua, interoperabilidad con IPS y COREPE y pruebas de conformidad |

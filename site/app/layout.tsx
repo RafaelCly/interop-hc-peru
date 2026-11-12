@@ -1,21 +1,22 @@
 import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
-import { SiteHeader } from "@/components/site-header";
-import { SiteFooter } from "@/components/site-footer";
+import { Fraunces } from "next/font/google";
 import "./globals.css";
 
+const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-fraunces", weight: ["500", "600"] });
+
 export const metadata: Metadata = {
-  title: { default: "Historia clínica unificada | interop-hc-peru", template: "%s | interop-hc-peru" },
+  title: { default: "Kipu · Tu historia clínica, contigo", template: "%s · Kipu" },
   description:
-    "Visor de resumen del paciente sobre FHIR que une Minsa, EsSalud y clínicas por DNI y avisa antes de repetir un examen.",
+    "Kipu reúne tus atenciones del Minsa, EsSalud y clínicas en una sola historia clínica. Tú decides quién la ve.",
   icons: { icon: "/favicon.svg" },
 };
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f3f6f7" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a1520" },
+    { media: "(prefers-color-scheme: light)", color: "#f4f1ea" },
+    { media: "(prefers-color-scheme: dark)", color: "#11131a" },
   ],
 };
 
@@ -23,22 +24,22 @@ const aplicarTema = `try{var t=localStorage.getItem("tema");if(t)document.docume
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className={`${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
+    <html
+      lang="es"
+      className={`${GeistSans.variable} ${GeistMono.variable} ${fraunces.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: aplicarTema }} />
       </head>
-      <body className="min-h-dvh flex flex-col font-sans antialiased">
+      <body className="min-h-dvh font-sans antialiased">
         <a
           href="#principal"
           className="absolute -top-16 left-4 z-[100] rounded-ctl bg-ink px-4 py-2 text-bg focus:top-4"
         >
           Saltar al contenido
         </a>
-        <SiteHeader />
-        <main id="principal" tabIndex={-1} className="flex-1 outline-none">
-          {children}
-        </main>
-        <SiteFooter />
+        {children}
       </body>
     </html>
   );

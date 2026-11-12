@@ -11,14 +11,22 @@ import {
   userRequests,
   userEvents,
   registerAccess,
+  registrarDescarga,
   hasPermission,
-  crearLlave,
-  canjearLlave,
   accesoEmergencia,
   checkOrigin,
+  agendaMedico,
+  abrirAtencion,
+  enviarSms,
+  verificarSms,
+  consultasPaciente,
+  cambiarAccesoPorAtencion,
 } from "@/lib/server/auth";
 import { clinicalSummary, catalogoExamenes } from "@/lib/server/clinical";
 import { ErrorAlmacen } from "@/lib/server/almacen";
+import { emitirCarnet } from "@/lib/server/carnet-servidor";
+import { historiaPdf } from "@/lib/server/historia-pdf";
+import { digitalizarResultado, confirmarLectura, descartarLectura, borrarAportado, aportadosDe } from "@/lib/server/digitalizar";
 import type { Clave } from "@/lib/data";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,10 +57,18 @@ async function manejarGet(req: NextRequest, c: Contexto) {
   if (action === "me") return response({ user: publicUser(u) });
   if (action === "solicitudes") return response({ solicitudes: await userRequests(u) });
   if (action === "auditoria") return response({ eventos: await userEvents(u) });
+  if (action === "agenda") {
+    if (u.role !== "medico") return forbidden();
+    return response({ citas: await agendaMedico(u) });
+  }
+  if (action === "consultas") {
+    if (u.role !== "paciente") return forbidden();
+    return response(await consultasPaciente(u));
+  }
   if (action === "catalogo") return response({ examenes: catalogoExamenes() });
   if (action === "historial") {
     const dni = u.role === "paciente" ? u.dni : req.nextUrl.searchParams.get("dni");
-    if (!dni || !/^[0-9]{8}$/.test(dni)) return bad("Es necesario un DNI sintético de ocho dígitos.");
+    if (!dni || !/^[0-9]{8}$/.test(dni)) return bad("Ingresa un DNI de ocho dígitos.");
     const s = await readState();
     const p = s.users.find((x) => x.role === "paciente" && x.dni === dni);
     if (!p) return response({ error: "Paciente no disponible." }, 404);
@@ -66,9 +82,40 @@ async function manejarGet(req: NextRequest, c: Contexto) {
       ? (omitir as Clave)
       : undefined;
     const resumen = clinicalSummary(dni, fuente);
-    if (!resumen) return response({ error: "Historia sintética no encontrada." }, 404);
+    if (!resumen) return response({ error: "No se encontró la historia del paciente." }, 404);
+    resumen.aportados = await aportadosDe(p.id);
     await registerAccess(u, p.id, true);
     return response({ resumen });
+  }
+  if (action === "historia-pdf") {
+    const dni = u.role === "paciente" ? u.dni : req.nextUrl.searchParams.get("dni");
+    if (!dni || !/^[0-9]{8}$/.test(dni)) return bad("Ingresa un DNI de ocho dígitos.");
+    const s = await readState();
+    const p = s.users.find((x) => x.role === "paciente" && x.dni === dni);
+    if (!p) return response({ error: "Paciente no disponible." }, 404);
+    const autorizado = (u.role === "paciente" && u.id === p.id) || hasPermission(s, u, dni);
+    if (!autorizado) {
+      await registerAccess(u, p.id, false);
+      return forbidden();
+    }
+    const resumen = clinicalSummary(dni);
+    if (!resumen) return response({ error: "No se encontró la historia del paciente." }, 404);
+    resumen.aportados = await aportadosDe(p.id);
+    const { bytes, nombre } = await historiaPdf(resumen, {
+      nombre: u.nombre,
+      rol: u.role,
+      cmp: u.cmp,
+      establecimiento: u.establecimiento,
+    });
+    await registrarDescarga(u, p.id);
+    return new NextResponse(Buffer.from(bytes), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${nombre}"`,
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
   }
   return response({ error: "No encontrado." }, 404);
 }
@@ -125,14 +172,33 @@ async function manejarPost(req: NextRequest, c: Contexto) {
       await decide(u, body.id, body.accion, Number(body.horas ?? 24));
       return response({ ok: true });
     }
-    if (action === "crear-llave") {
-      if (u.role !== "paciente") return forbidden();
-      return response(await crearLlave(u));
-    }
-    if (action === "canjear-llave") {
+    if (action === "abrir-atencion") {
       if (u.role !== "medico") return forbidden();
-      if (!body || typeof body.codigo !== "string" || body.codigo.length > 20) return bad("Ingrese el código.");
-      return response(await canjearLlave(u, body.codigo));
+      if (!body || typeof body.cita !== "string" || body.cita.length > 80) return bad("Cita no indicada.");
+      return response(await abrirAtencion(u, body.cita));
+    }
+    if (action === "enviar-sms") {
+      if (u.role !== "medico") return forbidden();
+      if (!body || typeof body.dni !== "string" || !/^[0-9]{8}$/.test(body.dni)) return bad("Ingresa un DNI de ocho dígitos.");
+      return response(await enviarSms(u, body.dni));
+    }
+    if (action === "verificar-sms") {
+      if (u.role !== "medico") return forbidden();
+      if (
+        !body ||
+        typeof body.dni !== "string" ||
+        !/^[0-9]{8}$/.test(body.dni) ||
+        typeof body.codigo !== "string" ||
+        body.codigo.length > 12
+      )
+        return bad("Ingresa el código de seis dígitos.");
+      return response(await verificarSms(u, body.dni, body.codigo));
+    }
+    if (action === "acceso-atencion") {
+      if (u.role !== "paciente") return forbidden();
+      if (!body || typeof body.activo !== "boolean") return bad("Valor incorrecto.");
+      await cambiarAccesoPorAtencion(u, body.activo);
+      return response({ ok: true });
     }
     if (action === "emergencia") {
       if (u.role !== "medico") return forbidden();
@@ -146,6 +212,35 @@ async function manejarPost(req: NextRequest, c: Contexto) {
       )
         return bad("Ingrese el DNI y el motivo de la emergencia (mínimo 15 caracteres).");
       return response(await accesoEmergencia(u, body.dni, body.motivo.trim()));
+    }
+    if (action === "carnet") {
+      if (u.role !== "paciente") return forbidden();
+      return response(await emitirCarnet(u));
+    }
+    if (action === "digitalizar") {
+      if (u.role !== "paciente") return forbidden();
+      if (!body || typeof body.imagen !== "string" || typeof body.tipo !== "string")
+        return bad("Adjunte la foto del resultado.");
+      return response(await digitalizarResultado(u, body.imagen, body.tipo));
+    }
+    if (action === "confirmar-lectura") {
+      if (u.role !== "paciente") return forbidden();
+      if (!body || typeof body.id !== "string" || body.id.length > 80) return bad("Lectura no indicada.");
+      const quitar = Array.isArray(body.quitar) ? (body.quitar as unknown[]).filter((x): x is number => Number.isInteger(x)).slice(0, 15) : [];
+      const n = await confirmarLectura(u, body.id, quitar);
+      return response({ mensaje: `${n} resultado(s) guardados en tu historia como aportados por ti.` });
+    }
+    if (action === "descartar-lectura") {
+      if (u.role !== "paciente") return forbidden();
+      if (!body || typeof body.id !== "string" || body.id.length > 80) return bad("Lectura no indicada.");
+      await descartarLectura(u, body.id);
+      return response({ mensaje: "Lectura descartada. Puedes tomar otra foto con mejor luz." });
+    }
+    if (action === "borrar-aportado") {
+      if (u.role !== "paciente") return forbidden();
+      if (!body || typeof body.id !== "string" || body.id.length > 40) return bad("Resultado no indicado.");
+      await borrarAportado(u, body.id);
+      return response({ ok: true });
     }
     return response({ error: "No encontrado." }, 404);
   } catch (e) {

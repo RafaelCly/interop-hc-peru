@@ -1,310 +1,381 @@
 "use client";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import type { Resumen, Atencion, Examen } from "@/lib/tipos";
-import { Warning, ListChecks } from "@phosphor-icons/react";
+import { CaretDown, DownloadSimple, MagnifyingGlass, Printer, Warning } from "@phosphor-icons/react";
 import { resumenConsulta } from "@/lib/resumen-consulta";
 import { btn, panel } from "@/components/ui";
-import { dateOnly, dateTime, useTerminologia } from "./shared";
-import { EXAMENES } from "@/lib/catalogo-clinico";
-type Tab = "resumen" | "atenciones" | "examenes" | "tratamientos" | "documentos" | "previos";
-const tabs: { id: Tab; label: string }[] = [
-  { id: "resumen", label: "Resumen" },
-  { id: "atenciones", label: "Atenciones" },
-  { id: "examenes", label: "Exámenes" },
-  { id: "tratamientos", label: "Tratamientos" },
-  { id: "documentos", label: "Informes" },
-  { id: "previos", label: "Examen previo" },
-];
-const cls = "min-h-11 w-full rounded-ctl border border-line bg-bg px-3 py-2 text-sm";
-const periodos = [
-  { value: "all", label: "Todo el período" },
-  { value: "7", label: "7 días" },
-  { value: "30", label: "30 días" },
-  { value: "90", label: "3 meses" },
-  { value: "180", label: "6 meses" },
-  { value: "365", label: "12 meses" },
-];
-const isIn = (day: string, days: string) =>
-  days === "all" || (Date.now() - Date.parse(day + "T12:00:00-05:00")) / 86400000 <= Number(days);
-const str = (s?: string) => s?.trim() || "No registrado";
-function DatosExamen({ e }: { e: Examen }) {
-  const m = e.codigo ? EXAMENES[e.codigo] : undefined;
-  const { items } = useTerminologia();
-  const oficial = e.codigo ? items[e.codigo] : undefined;
+import { dateOnly, dateTime } from "./shared";
+import { EXAMENES, interpretarResultado } from "@/lib/catalogo-clinico";
+import { AportadosPaciente } from "./aportes";
+
+type Tab = "resumen" | "atenciones" | "examenes" | "medicamentos" | "informes" | "previos";
+
+const control =
+  "min-h-10 rounded-ctl border border-line bg-surface px-3 text-[0.9rem] text-ink focus:border-accent focus:outline-none";
+const etiqueta = "text-[0.75rem] font-medium uppercase tracking-[0.06em] text-muted";
+const dias = (iso: string) => Math.round((Date.now() - Date.parse(iso + "T12:00:00-05:00")) / 86_400_000);
+const hace = (iso: string) => {
+  const d = dias(iso);
+  return d <= 0 ? "hoy" : d === 1 ? "ayer" : d < 60 ? `hace ${d} días` : `hace ${Math.round(d / 30)} meses`;
+};
+const vigente = (m: Resumen["medicamentos"][number]) =>
+  m.fuentes.some((f) => f.estado === "active" && (!f.fin || f.fin >= new Date().toISOString().slice(0, 10)));
+// Un resultado se marca para revisar con las mismas reglas del catálogo (umbrales ADA y afines).
+const revisar = (e: Examen) =>
+  !!e.codigo && typeof e.valor === "number" && interpretarResultado(e.codigo, e.valor).estado === "revisar";
+
+// Quita las marcas de datos de prueba que traen las fuentes.
+const limpio = (t = "") =>
+  t
+    .replace(/\s*\([^)]*(sint[eé]tic|acad[eé]mic|simulad)[^)]*\)/gi, "")
+    .replace(/[;,]?\s*indicaci[oó]n cl[ií]nica simulada\.?/gi, ".")
+    .replace(/\.\./g, ".")
+    .trim();
+
+function Vacio({ children }: { children: React.ReactNode }) {
+  return <p className="py-8 text-center text-[0.92rem] text-muted">{children}</p>;
+}
+
+function Seccion({ titulo, n, children }: { titulo: string; n?: number; children: React.ReactNode }) {
   return (
-    <div className="rounded-ctl border border-line bg-bg p-3.5">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <p className="text-sm font-semibold">{e.nombre}</p>
-          <p className="mt-1 text-xs text-muted">
-            {e.tipo === "imagen" ? "Imagenología" : e.tipo === "gabinete" ? "Gabinete / ECG" : "Laboratorio"}{" "}
-            · {e.codigo ? `LOINC ${e.codigo}` : "No normalizado"}
-          </p>
-          <p className="min-h-4 text-xs text-muted">{oficial}</p>
-        </div>
-        <span className="rounded-full bg-surface-2 px-2 py-1 text-xs text-muted">
-          {e.estado === "final" ? "Final" : str(e.estado)}
-        </span>
-      </div>
-      <p className="mt-3 break-words text-base font-bold tabular-nums">{e.resultado}</p>
-      {e.referencia && (
-        <p className="mt-1 text-sm text-muted">
-          <strong className="font-semibold text-ink">Referencia orientativa:</strong> {e.referencia}
-        </p>
-      )}
-      {e.interpretacion && (
-        <p className="mt-2 rounded-md bg-warn-bg px-3 py-2 text-xs text-ink">
-          Orientación educativa: {e.interpretacion}. No equivale a diagnóstico.
-        </p>
-      )}
-      <ul className="mt-3 grid gap-1.5 text-xs text-muted sm:grid-cols-2">
-        <li>Muestra: {str(e.muestra)}</li>
-        <li>Fecha: {dateOnly(e.fecha)}</li>
-        <li className="sm:col-span-2">Sede: {e.establecimiento} (simulada)</li>
-        <li>Identificador: {e.idLocal}</li>
-        <li>Estado: {str(e.estado)}</li>
-      </ul>
-      {m?.nota && <p className="mt-2 text-xs text-muted">{m.nota}</p>}
-      {e.fuenteReferencia && (
-        <a
-          className="mt-2 inline-block break-all text-xs font-semibold text-accent-strong underline"
-          href={e.fuenteReferencia}
-          rel="noreferrer noopener"
-          target="_blank"
-        >
-          Referencia clínica consultada
-        </a>
-      )}
+    <section className={panel}>
+      <h3 className="text-[0.98rem] font-semibold">
+        {titulo}
+        {n !== undefined && <span className="font-normal text-muted tabular-nums"> · {n}</span>}
+      </h3>
+      <div className="mt-3">{children}</div>
+    </section>
+  );
+}
+
+// Barra de búsqueda y filtros en una sola línea.
+function Filtros({
+  buscar,
+  setBuscar,
+  sede,
+  setSede,
+  sedes,
+}: {
+  buscar: string;
+  setBuscar: (v: string) => void;
+  sede: string;
+  setSede: (v: string) => void;
+  sedes: string[];
+}) {
+  return (
+    <div className="mb-4 flex flex-wrap gap-2">
+      <label className="relative min-w-[14rem] flex-1">
+        <span className="sr-only">Buscar</span>
+        <MagnifyingGlass size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden />
+        <input
+          className={`${control} w-full pl-9`}
+          placeholder="Buscar"
+          value={buscar}
+          onChange={(e) => setBuscar(e.target.value)}
+        />
+      </label>
+      <label>
+        <span className="sr-only">Sede</span>
+        <select className={control} value={sede} onChange={(e) => setSede(e.target.value)}>
+          <option value="all">Todas las sedes</option>
+          {sedes.map((x) => (
+            <option key={x} value={x}>
+              {x}
+            </option>
+          ))}
+        </select>
+      </label>
     </div>
   );
 }
-function Encounter({ a }: { a: Atencion }) {
+
+// Tabla de resultados: una fila por examen; el detalle se abre solo si se pide.
+function TablaExamenes({ lista, conSede = true }: { lista: Examen[]; conSede?: boolean }) {
+  const [abierto, setAbierto] = useState<string | null>(null);
+  if (!lista.length) return <Vacio>No hay resultados.</Vacio>;
   return (
-    <details className="group rounded-card border border-line bg-surface">
-      <summary className="cursor-pointer list-none p-4 sm:p-5 [&::-webkit-details-marker]:hidden">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <p className="font-semibold">{a.establecimiento}</p>
-            <p className="mt-1 text-sm text-muted">
-              {a.profesional} · {a.tipo.replace(" - demostración", "")}
-            </p>
-          </div>
-          <span className="whitespace-nowrap text-sm font-medium tabular-nums">{dateTime(a.fechaHora)}</span>
-        </div>
-        <p className="mt-2 text-sm">{a.motivo}</p>
-        <p className="mt-2 text-xs font-semibold text-accent-strong">
-          {a.examenes.length} resultados · {a.medicamentos.length} medicamentos · Ver atención completa
-        </p>
-      </summary>
-      <div className="grid gap-4 border-t border-line p-4 sm:p-5">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <h4 className="text-sm font-bold">Síntomas / anamnesis</h4>
-            <p className="mt-1 text-sm text-muted">{str(a.sintomas)}</p>
-          </div>
-          <div>
-            <h4 className="text-sm font-bold">Signos vitales</h4>
-            <p className="mt-1 text-sm text-muted">{str(a.signos)}</p>
-          </div>
-        </div>
-        <div>
-          <h4 className="text-sm font-bold">Evaluación clínica</h4>
-          <p className="mt-1 text-sm text-muted">{str(a.evaluacion)}</p>
-        </div>
-        <div>
-          <h4 className="text-sm font-bold">Diagnóstico documentado</h4>
-          <p className="mt-1 text-sm text-muted">{str(a.diagnostico)}</p>
-        </div>
-        <div>
-          <h4 className="text-sm font-bold">Tratamiento indicado</h4>
-          <p className="mt-1 text-sm text-muted">
-            {a.medicamentos.length
-              ? a.medicamentos.join(" · ")
-              : "No se registran medicamentos para esta atención."}
-          </p>
-        </div>
-        <div>
-          <h4 className="text-sm font-bold">Plan y seguimiento</h4>
-          <p className="mt-1 text-sm text-muted">
-            {str(a.plan)} {str(a.seguimiento)}
-          </p>
-        </div>
-        <div>
-          <h4 className="mb-2 text-sm font-bold">Resultados asociados a esta atención</h4>
-          {a.examenes.length ? (
-            <div className="grid gap-2 xl:grid-cols-2">
-              {a.examenes.map((e) => (
-                <DatosExamen key={`${e.sistema}-${e.idLocal}`} e={e} />
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted">No hay resultados vinculados a este encuentro.</p>
-          )}
-        </div>
-      </div>
-    </details>
+    <div className="tabla-ex">
+      <table className="w-full text-left text-[0.92rem]">
+        <thead>
+          <tr className={`${etiqueta} border-b border-line`}>
+            <th className="py-2 pr-3 font-medium">Examen</th>
+            <th className="py-2 pr-3 font-medium">Resultado</th>
+            <th className="py-2 pr-3 font-medium">Fecha</th>
+            {conSede && <th className="py-2 pr-3 font-medium">Sede</th>}
+            <th className="w-8 py-2" aria-label="Detalle" />
+          </tr>
+        </thead>
+        <tbody>
+          {lista.map((e) => {
+            const id = `${e.sistema}-${e.idLocal}`;
+            const abiertoEste = abierto === id;
+            const marca = revisar(e);
+            return (
+              <Fragment key={id}>
+                <tr
+                  className="cursor-pointer border-b border-line/70 transition-colors hover:bg-surface-2/50"
+                  onClick={() => setAbierto(abiertoEste ? null : id)}
+                >
+                  <td className="py-2.5 pr-3 font-medium">{e.nombre}</td>
+                  <td data-label="Resultado" className="py-2.5 pr-3 tabular-nums">
+                    <span className="inline-flex items-center gap-2 font-semibold">
+                      {e.resultado}
+                      {marca && (
+                        <span className="rounded-full bg-warn-bg px-2 py-0.5 text-[0.72rem] font-semibold text-warn">
+                          Revisar
+                        </span>
+                      )}
+                    </span>
+                  </td>
+                  <td data-label="Fecha" className="whitespace-nowrap py-2.5 pr-3 text-muted tabular-nums">
+                    {dateOnly(e.fecha)}
+                  </td>
+                  {conSede && (
+                    <td data-label="Sede" className="py-2.5 pr-3 text-muted">
+                      {e.establecimiento}
+                    </td>
+                  )}
+                  <td className="py-2.5 text-right">
+                    <button
+                      type="button"
+                      aria-expanded={abiertoEste}
+                      aria-label={`Detalle de ${e.nombre}`}
+                      className="inline-grid size-8 place-items-center rounded-ctl text-muted hover:bg-surface-2 hover:text-ink"
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        setAbierto(abiertoEste ? null : id);
+                      }}
+                    >
+                      <CaretDown size={15} className={`transition-transform ${abiertoEste ? "rotate-180" : ""}`} />
+                    </button>
+                  </td>
+                </tr>
+                {abiertoEste && (
+                  <tr className="border-b border-line/70 bg-surface-2/40">
+                    <td colSpan={conSede ? 5 : 4} className="px-3 py-3">
+                      <dl className="grid gap-x-8 gap-y-2 text-[0.86rem] sm:grid-cols-3">
+                        <div>
+                          <dt className="text-muted">Referencia</dt>
+                          <dd>{e.referencia ?? "—"}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-muted">Muestra</dt>
+                          <dd>{e.muestra ?? "—"}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-muted">Código LOINC</dt>
+                          <dd className="font-mono">{e.codigo ?? "—"}</dd>
+                        </div>
+                        {e.interpretacion && (
+                          <div className="sm:col-span-3">
+                            <dt className="text-muted">Lectura</dt>
+                            <dd>{e.interpretacion}</dd>
+                          </div>
+                        )}
+                      </dl>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
+
+// Atenciones como un cordón: cada nudo es una visita; se despliega para ver el detalle.
+function Atenciones({ lista }: { lista: Atencion[] }) {
+  if (!lista.length) return <Vacio>No hay atenciones.</Vacio>;
+  return (
+    <ol>
+      {lista.map((a, i) => (
+        <li key={a.id} className="relative grid grid-cols-[1.25rem_minmax(0,1fr)] gap-x-4">
+          {i < lista.length - 1 && (
+            <span aria-hidden className="absolute bottom-0 left-[0.6rem] top-5 w-px bg-line" />
+          )}
+          <span aria-hidden className="relative mt-[1.15rem] size-3 justify-self-center rounded-full bg-accent ring-4 ring-surface" />
+          <details className="group min-w-0 border-b border-line/70 py-3 last:border-0">
+            <summary className="flex cursor-pointer list-none flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 [&::-webkit-details-marker]:hidden">
+              <span className="min-w-0">
+                <span className="font-semibold">{a.diagnostico || a.motivo}</span>
+                <span className="block text-[0.86rem] text-muted">
+                  {a.establecimiento} · {a.profesional}
+                </span>
+              </span>
+              <span className="inline-flex items-center gap-2 whitespace-nowrap text-[0.86rem] text-muted tabular-nums">
+                {dateOnly(a.fecha)}
+                <CaretDown size={14} className="transition-transform group-open:rotate-180" aria-hidden />
+              </span>
+            </summary>
+            <dl className="mt-3 grid gap-x-8 gap-y-3 text-[0.9rem] sm:grid-cols-2">
+              {[
+                ["Motivo", limpio(a.motivo)],
+                ["Signos vitales", limpio(a.signos)],
+                ["Indicaciones", a.medicamentos.join(" · ")],
+                ["Plan", limpio([a.plan, a.seguimiento].filter(Boolean).join(" "))],
+              ]
+                .filter(([, v]) => v?.trim())
+                .map(([k, v]) => (
+                  <div key={k}>
+                    <dt className="text-[0.8rem] text-muted">{k}</dt>
+                    <dd>{v}</dd>
+                  </div>
+                ))}
+            </dl>
+            {a.examenes.length > 0 && (
+              <div className="mt-3">
+                <TablaExamenes lista={a.examenes} conSede={false} />
+              </div>
+            )}
+          </details>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export function Historia({ r, paraPaciente = false }: { r: Resumen; paraPaciente?: boolean }) {
-  const [codigoPedido, setCodigoPedido] = useState("2345-7");
   const [tab, setTab] = useState<Tab>("resumen"),
     [buscar, setBuscar] = useState(""),
-    [periodo, setPeriodo] = useState("all"),
     [sede, setSede] = useState("all"),
-    [tipo, setTipo] = useState("all"),
-    [motivo, setMotivo] = useState("");
+    [motivo, setMotivo] = useState(""),
+    [codigoPedido, setCodigoPedido] = useState("2345-7");
   const puntos = useMemo(() => resumenConsulta(r, motivo), [r, motivo]);
-  const sedes = useMemo(
-    () => [...new Set(r.atenciones.map((a) => a.establecimiento))].sort(),
-    [r.atenciones],
-  );
+  const sedes = useMemo(() => [...new Set(r.atenciones.map((a) => a.establecimiento))].sort(), [r.atenciones]);
+  const q = buscar.trim().toLowerCase();
   const atenciones = useMemo(
     () =>
       r.atenciones.filter(
         (a) =>
-          isIn(a.fecha, periodo) &&
           (sede === "all" || a.establecimiento === sede) &&
-          (tipo === "all" || a.examenes.some((e) => e.tipo === tipo)) &&
-          [
-            a.motivo,
-            a.diagnostico,
-            a.sintomas,
-            a.profesional,
-            a.establecimiento,
-            ...a.medicamentos,
-            ...a.examenes.map((e) => e.nombre),
-          ]
+          [a.motivo, a.diagnostico, a.profesional, a.establecimiento, ...a.medicamentos, ...a.examenes.map((e) => e.nombre)]
             .join(" ")
             .toLowerCase()
-            .includes(buscar.toLowerCase()),
+            .includes(q),
       ),
-    [r.atenciones, buscar, periodo, sede, tipo],
+    [r.atenciones, sede, q],
   );
   const examenes = useMemo(
     () =>
       r.examenes.filter(
         (e) =>
-          isIn(e.fecha, periodo) &&
           (sede === "all" || e.establecimiento === sede) &&
-          (tipo === "all" || e.tipo === tipo) &&
-          [e.nombre, e.establecimiento, e.resultado].join(" ").toLowerCase().includes(buscar.toLowerCase()),
+          [e.nombre, e.establecimiento, e.resultado].join(" ").toLowerCase().includes(q),
       ),
-    [r.examenes, periodo, sede, tipo, buscar],
+    [r.examenes, sede, q],
   );
-  const { version } = useTerminologia();
   const incompletos = r.traza.sistemas.filter((x) => x.estado === "no_disponible");
-  const activos = r.medicamentos.filter((m) =>
-    m.fuentes.some(
-      (f) => f.estado === "active" && (!f.fin || f.fin >= new Date().toISOString().slice(0, 10)),
-    ),
+  const activos = r.medicamentos.filter(vigente);
+  // Lo que pide atención primero; lo informativo solo si se relaciona con el motivo escrito.
+  const importantes = puntos.filter(
+    (p) => p.nivel !== "info" && !p.titulo.startsWith("Alergia a ") || (motivo.trim() && p.relevante && p.nivel === "info"),
   );
+  const ultimos = r.examenes.slice(0, 6);
+  const previos = r.examenes.filter((e) => e.codigo === codigoPedido).sort((a, b) => b.fecha.localeCompare(a.fecha));
+  const ventana = EXAMENES[codigoPedido]?.dias ?? 30;
+
+  const tabs: { id: Tab; t: string; n?: number }[] = [
+    { id: "resumen", t: "Resumen" },
+    { id: "atenciones", t: "Atenciones", n: r.atenciones.length },
+    { id: "examenes", t: "Exámenes", n: r.examenes.length + (r.aportados?.length ?? 0) },
+    { id: "medicamentos", t: "Medicamentos", n: r.medicamentos.length },
+    { id: "informes", t: "Informes" },
+    ...(paraPaciente ? [] : [{ id: "previos" as Tab, t: "Antes de pedir un examen" }]),
+  ];
+
   return (
     <article className="grid min-w-0 gap-5">
-      <div className={panel}>
-        <div className="flex flex-wrap justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted">
-              Expediente longitudinal · ficticio
-            </p>
-            <h2 className="mt-1 text-2xl font-bold">{r.nombre}</h2>
-            <p className="mt-1 text-sm text-muted">
-              DNI sintético {r.dni} · {r.edad} años ·{" "}
-              {r.sexo === "female" ? "Femenino" : r.sexo === "male" ? "Masculino" : "No especificado"}
-            </p>
-          </div>
-          <p className="max-w-xs text-xs text-muted">
-            {paraPaciente ? "Vista del titular de la cuenta" : "Consulta autorizada para la atención"} · No es
-            una fuente de decisiones clínicas reales.
+      <header className={panel}>
+        <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+          <h2 className="text-[1.45rem] font-semibold tracking-[-0.015em]">{r.nombre}</h2>
+          <p className="text-[0.9rem] text-muted">
+            <span className="font-mono">DNI {r.dni}</span> · {r.edad} años ·{" "}
+            {r.sexo === "female" ? "Mujer" : r.sexo === "male" ? "Hombre" : "Sin dato"}
           </p>
         </div>
-        {incompletos.length > 0 && (
-          <p className="mt-4 rounded-ctl border border-warn-line bg-warn-bg p-3 text-sm" role="status">
-            Resumen parcial: {incompletos.map((s) => s.clave).join(", ")} no respondió en esta simulación. No
-            se puede concluir que el paciente carezca de registros en esa fuente.
-          </p>
-        )}
-        {r.alergias.length > 0 && (
-          <div
-            role="note"
-            className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-ctl border border-danger-line bg-danger-bg px-4 py-2.5 text-danger"
+        <div className="no-imprimir mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <a
+            href={`/api/portal/historia-pdf?dni=${encodeURIComponent(r.dni)}`}
+            download
+            className={`${btn.secondary} ${btn.sm} no-underline`}
           >
-            <span className="inline-flex items-center gap-2 text-sm font-bold">
-              <Warning size={18} weight="fill" aria-hidden /> Alergias
-            </span>
-            <span className="text-sm font-semibold">{r.alergias.map((a) => a.sustancia).join(", ")}</span>
-          </div>
-        )}
-        {r.seguridad.length > 0 && (
-          <div role="alert" className="mt-4 rounded-ctl border-2 border-danger bg-danger-bg px-4 py-3 text-danger">
-            <p className="inline-flex items-center gap-2 text-sm font-bold">
-              <Warning size={18} weight="fill" aria-hidden /> Alerta de seguridad entre sedes
-            </p>
-            <ul className="mt-2 grid gap-2">
-              {r.seguridad.map((s, i) => (
-                <li key={i} className="text-sm text-ink">
-                  <strong>
-                    Alergia a {s.alergia} y {s.medicamento}
-                  </strong>{" "}
-                  ({s.relacion}). Alergia en {s.lugarAlergia}; medicamento en {s.lugarMedicamento}
-                  {s.entreSedes ? ", otra sede" : ""}.{" "}
-                  {s.vigente ? "Figura como activo." : "Figura como finalizado."} Confirmar con el paciente antes
-                  de indicar.
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        <div className="mt-4 grid gap-2 sm:grid-cols-4">
-          {[
-            { n: r.atenciones.length, t: "Atenciones" },
-            { n: r.examenes.length, t: "Resultados" },
-            { n: r.medicamentos.length, t: "Medicamentos" },
-            { n: r.alergias.length, t: "Alergias" },
-          ].map((x) => (
-            <div className="rounded-ctl bg-surface-2 p-3" key={x.t}>
-              <p className="text-2xl font-bold tabular-nums">{x.n}</p>
-              <p className="text-xs text-muted">{x.t}</p>
-            </div>
-          ))}
+            <DownloadSimple size={16} weight="bold" aria-hidden /> Descargar historia (PDF)
+          </a>
+          <span className="text-[0.8rem] text-muted">
+            {paraPaciente ? "La descarga queda en tu registro de accesos." : "La descarga queda registrada y el paciente la verá."}
+          </span>
         </div>
-      </div>
-      <nav
-        aria-label="Secciones del expediente"
-        className="flex gap-1 overflow-x-auto rounded-ctl border border-line bg-surface p-1"
-      >
-        {tabs
-          .filter((x) => !paraPaciente || x.id !== "previos")
-          .map((x) => (
-            <button
-              type="button"
-              key={x.id}
-              onClick={() => setTab(x.id)}
-              aria-current={tab === x.id ? "page" : undefined}
-              className={`min-h-11 shrink-0 rounded-md px-3.5 py-2 text-sm font-semibold ${tab === x.id ? "bg-accent-soft text-accent-strong" : "text-muted hover:bg-surface-2"}`}
-            >
-              {x.label}
-            </button>
-          ))}
+        {(r.alergias.length > 0 || r.seguridad.length > 0 || incompletos.length > 0) && (
+          <div className="mt-4 grid gap-2">
+            {r.alergias.length > 0 && (
+              <p className="flex flex-wrap items-center gap-2 text-[0.92rem]">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-danger-bg px-2.5 py-1 text-[0.82rem] font-semibold text-danger">
+                  <Warning size={15} weight="fill" aria-hidden /> Alergia
+                </span>
+                <span className="font-semibold">{r.alergias.map((a) => a.sustancia).join(", ")}</span>
+                <span className="text-muted">
+                  {r.alergias
+                    .map((a) => a.reaccion)
+                    .filter(Boolean)
+                    .join(", ")}
+                </span>
+              </p>
+            )}
+            {r.seguridad.map((s, i) => (
+              <p
+                key={i}
+                role="alert"
+                className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-ctl border border-danger-line bg-danger-bg px-3.5 py-2.5 text-[0.92rem]"
+              >
+                <Warning size={17} weight="fill" className="text-danger" aria-hidden />
+                <strong className="font-semibold text-danger">
+                  {s.medicamento} {s.vigente ? "activo" : ""}
+                </strong>
+                <span>con alergia a {s.alergia.toLowerCase()}</span>
+                <span className="text-muted">
+                  · {s.entreSedes ? "registrado en otra sede" : s.lugarMedicamento}
+                </span>
+              </p>
+            ))}
+            {incompletos.length > 0 && (
+              <p role="status" className="rounded-ctl border border-warn-line bg-warn-bg px-3.5 py-2.5 text-[0.9rem]">
+                {incompletos.map((s) => s.clave).join(", ")} no respondió: la historia puede estar incompleta.
+              </p>
+            )}
+          </div>
+        )}
+      </header>
+
+      <nav aria-label="Secciones de la historia" className="no-imprimir flex gap-1 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_var(--line)] [scrollbar-width:none]">
+        {tabs.map((x) => (
+          <button
+            type="button"
+            key={x.id}
+            onClick={() => setTab(x.id)}
+            aria-current={tab === x.id ? "page" : undefined}
+            className={`min-h-11 shrink-0 border-b-2 px-3.5 py-2 text-[0.92rem] font-medium transition-colors ${tab === x.id ? "border-accent text-ink" : "border-transparent text-muted hover:text-ink"}`}
+          >
+            {x.t}
+            {x.n !== undefined && <span className="ml-1.5 text-[0.8rem] text-muted tabular-nums">{x.n}</span>}
+          </button>
+        ))}
       </nav>
+
       {tab === "resumen" && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <section className={`${panel} lg:col-span-2`} aria-labelledby="resumen-consulta">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h3 id="resumen-consulta" className="inline-flex items-center gap-2 text-lg font-bold">
-                  <ListChecks size={20} aria-hidden /> {paraPaciente ? "Lo más importante de tu historial" : "Resumen para la consulta"}
-                </h3>
-                <p className="mt-1 max-w-2xl text-xs text-muted">
-                  Lo urgente primero. Cada punto indica la sede que lo registró. Se arma con reglas sobre los
-                  datos autorizados; no diagnostica ni reemplaza la revisión del expediente.
-                </p>
-              </div>
+        <div className="grid gap-4">
+          <section className={panel}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-[0.98rem] font-semibold">
+                Para revisar <span className="font-normal text-muted tabular-nums">· {importantes.length}</span>
+              </h3>
               {!paraPaciente && (
-                <label className="grid min-w-64 gap-1 text-xs font-semibold">
-                  Motivo de la consulta (opcional)
+                <label className="w-full sm:w-72">
+                  <span className="sr-only">Motivo de la consulta</span>
                   <input
-                    className={cls}
-                    placeholder="Ej.: dolor de pecho, cansancio, azúcar alta"
+                    className={`${control} w-full`}
+                    placeholder="Motivo de la consulta (opcional)"
                     value={motivo}
                     maxLength={120}
                     onChange={(e) => setMotivo(e.target.value)}
@@ -312,209 +383,180 @@ export function Historia({ r, paraPaciente = false }: { r: Resumen; paraPaciente
                 </label>
               )}
             </div>
-            <ul className="mt-4 grid gap-2 lg:grid-cols-2">
-              {puntos.map((p) => (
-                <li
-                  key={p.id}
-                  className={`rounded-ctl border p-3 ${
-                    p.nivel === "critico"
-                      ? "border-danger-line bg-danger-bg"
-                      : p.nivel === "atencion"
-                        ? "border-warn-line bg-warn-bg"
-                        : "border-line bg-surface"
-                  }`}
-                >
-                  <p className="text-sm font-semibold">
-                    {p.titulo}
-                    {p.relevante && motivo.trim() && p.nivel === "info" && (
-                      <span className="ml-2 rounded-full bg-accent-soft px-2 py-0.5 text-xs text-accent-strong">
-                        Relacionado con el motivo
-                      </span>
-                    )}
-                  </p>
-                  <p className="mt-1 text-sm text-muted">{p.detalle}</p>
-                  <p className="mt-1 text-xs text-muted">Fuente: {p.fuente}</p>
-                </li>
-              ))}
-            </ul>
-          </section>
-          <section className={panel}>
-            <h3 className="text-lg font-bold">Alergias documentadas</h3>
-            <div className="mt-3 grid gap-2">
-              {r.alergias.length ? (
-                r.alergias.map((x) => (
-                  <div key={x.sustancia} className="rounded-ctl border border-danger-line bg-danger-bg p-3">
-                    <strong>{x.sustancia}</strong>
-                    <p className="mt-1 text-sm">Reacción: {str(x.reaccion)}</p>
-                    <p className="mt-1 text-xs text-muted">
-                      Fuente: {x.fuentes.map((f) => f.lugar).join(" · ")}
-                    </p>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-muted">
-                  Sin alergias documentadas en las fuentes disponibles. No equivale a ausencia confirmada de
-                  alergias.
-                </p>
-              )}
-            </div>
-          </section>
-          <section className={panel}>
-            <h3 className="text-lg font-bold">Condiciones y antecedentes registrados</h3>
-            <div className="mt-3 grid gap-2">
-              {r.condiciones.length ? (
-                r.condiciones.map((x) => (
-                  <div key={x.codigo} className="rounded-ctl border border-line px-3 py-2.5">
-                    <strong className="text-sm">{x.nombre}</strong>
-                    <p className="mt-1 text-xs text-muted">
-                      CIE-10: {x.codigo} · {x.fuentes.map((f) => f.lugar).join(", ")}
-                    </p>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-muted">No se encontraron diagnósticos documentados.</p>
-              )}
-            </div>
-          </section>
-          <section className={panel}>
-            <h3 className="text-lg font-bold">Tratamientos posiblemente vigentes</h3>
-            <p className="mt-1 text-xs text-muted">
-              Una prescripción registrada no demuestra uso real. Confirmar con el paciente.
-            </p>
-            {activos.length ? (
-              activos.map((x) => (
-                <div key={x.nombre} className="mt-3 rounded-ctl bg-surface-2 p-3">
-                  <strong className="text-sm">{x.nombre}</strong>
-                  <p className="mt-1 text-xs text-muted">
-                    Según la fuente: {x.fuentes.map((f) => f.lugar).join(", ")}
-                  </p>
-                </div>
-              ))
-            ) : (
-              <p className="mt-3 text-sm text-muted">No hay tratamientos identificados como activos.</p>
-            )}
-          </section>
-          <section className={panel}>
-            <h3 className="text-lg font-bold">Continuidad de atención</h3>
-            <p className="mt-2 text-sm text-muted">
-              {r.atenciones.length} atenciones en las fuentes disponibles; última registrada:{" "}
-              {dateOnly(r.atenciones[0]?.fecha)}.
-            </p>
-            <p className="mt-3 text-sm">
-              {r.repetidos.length} coincidencias de exámenes previos relacionados entre fuentes.
-            </p>
-            {r.repetidos.length > 0 && (
-              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-warn">
-                {r.repetidos.map((a) => (
-                  <li key={a.codigo + a.fechaRepeticion}>
-                    {a.examen}: {dateOnly(a.fechaAnterior)} en {a.lugarAnterior} y{" "}
-                    {dateOnly(a.fechaRepeticion)} en {a.lugarRepeticion} ({a.dias} días de diferencia).
+            {importantes.length ? (
+              <ul className="mt-3 divide-y divide-line/70">
+                {importantes.map((p) => (
+                  <li key={p.id} className="flex items-start gap-3 py-2.5">
+                    <span
+                      aria-hidden
+                      className={`mt-[0.45rem] size-2 shrink-0 rounded-full ${p.nivel === "critico" ? "bg-danger" : p.nivel === "atencion" ? "bg-warn" : "bg-accent"}`}
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-[0.93rem] font-medium">{p.titulo}</span>
+                      <span className="block text-[0.82rem] text-muted">{p.fuente}</span>
+                    </span>
                   </li>
                 ))}
               </ul>
+            ) : (
+              <p className="mt-3 text-[0.92rem] text-muted">Nada pendiente de revisar.</p>
             )}
-            <p className="mt-2 text-xs text-muted">
-              Estas coincidencias son orientativas. No se consideran duplicidades injustificadas sin
-              evaluación clínica.
+          </section>
+
+          <div className="grid gap-4 lg:grid-cols-3">
+            <Seccion titulo="Condiciones" n={r.condiciones.length}>
+              {r.condiciones.length ? (
+                <ul className="flex flex-col gap-2">
+                  {r.condiciones.map((c) => (
+                    <li key={c.codigo} className="flex items-baseline justify-between gap-3 text-[0.92rem]">
+                      {c.nombre}
+                      <span className="font-mono text-[0.78rem] text-muted">{c.codigo}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-[0.9rem] text-muted">Sin condiciones registradas.</p>
+              )}
+            </Seccion>
+            <Seccion titulo="Medicamentos activos" n={activos.length}>
+              {activos.length ? (
+                <ul className="flex flex-col gap-2 text-[0.92rem]">
+                  {activos.map((m) => (
+                    <li key={m.nombre}>{m.nombre}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-[0.9rem] text-muted">Ninguno registrado como activo.</p>
+              )}
+            </Seccion>
+            <Seccion titulo="Últimos resultados">
+              {ultimos.length ? (
+                <ul className="flex flex-col gap-2 text-[0.92rem]">
+                  {ultimos.map((e) => (
+                    <li key={`${e.sistema}-${e.idLocal}`} className="flex items-baseline justify-between gap-3">
+                      <span className="min-w-0 truncate">{e.nombre}</span>
+                      <span className={`whitespace-nowrap font-semibold tabular-nums ${revisar(e) ? "text-warn" : ""}`}>
+                        {e.resultado}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-[0.9rem] text-muted">Sin resultados.</p>
+              )}
+              {r.examenes.length > ultimos.length && (
+                <button
+                  type="button"
+                  onClick={() => setTab("examenes")}
+                  className="mt-3 text-[0.86rem] font-medium text-accent-strong hover:underline"
+                >
+                  Ver los {r.examenes.length}
+                </button>
+              )}
+            </Seccion>
+          </div>
+          {r.atenciones[0] && (
+            <p className="text-[0.86rem] text-muted">
+              Última atención {hace(r.atenciones[0].fecha)} en {r.atenciones[0].establecimiento}.
             </p>
+          )}
+        </div>
+      )}
+
+      {tab === "atenciones" && (
+        <section className={panel}>
+          <Filtros buscar={buscar} setBuscar={setBuscar} sede={sede} setSede={setSede} sedes={sedes} />
+          <Atenciones lista={atenciones} />
+        </section>
+      )}
+
+      {tab === "examenes" && (
+        <div className="grid min-w-0 gap-4 [&>*]:min-w-0">
+          <AportadosPaciente aportados={r.aportados ?? []} />
+          <section className={panel}>
+            <Filtros buscar={buscar} setBuscar={setBuscar} sede={sede} setSede={setSede} sedes={sedes} />
+            <TablaExamenes lista={examenes} />
           </section>
         </div>
       )}
-      {(tab === "atenciones" || tab === "examenes" || tab === "documentos") && (
+
+      {tab === "medicamentos" && (
         <section className={panel}>
-          <h3 className="text-lg font-bold">Filtros de búsqueda</h3>
-          <p className="mt-1 text-sm text-muted">
-            Buscar por fecha, establecimiento, profesional, diagnóstico o nombre del examen.
-          </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <label className="grid gap-1 text-xs font-semibold">
-              Buscar
-              <input
-                className={cls}
-                placeholder="Ej.: glucosa, anemia..."
-                value={buscar}
-                onChange={(e) => setBuscar(e.target.value)}
-              />
-            </label>
-            <label className="grid gap-1 text-xs font-semibold">
-              Período
-              <select className={cls} value={periodo} onChange={(e) => setPeriodo(e.target.value)}>
-                {periodos.map((x) => (
-                  <option value={x.value} key={x.value}>
-                    {x.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="grid gap-1 text-xs font-semibold">
-              Establecimiento
-              <select className={cls} value={sede} onChange={(e) => setSede(e.target.value)}>
-                <option value="all">Todas las sedes</option>
-                {sedes.map((x) => (
-                  <option key={x} value={x}>
-                    {x}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="grid gap-1 text-xs font-semibold">
-              Categoría
-              <select className={cls} value={tipo} onChange={(e) => setTipo(e.target.value)}>
-                <option value="all">Todas</option>
-                <option value="laboratorio">Laboratorio</option>
-                <option value="imagen">Imágenes</option>
-                <option value="gabinete">Gabinete / ECG</option>
-              </select>
-            </label>
-          </div>
-          <button
-            className="mt-3 text-xs font-semibold text-accent-strong underline"
-            type="button"
-            onClick={() => {
-              setBuscar("");
-              setPeriodo("all");
-              setSede("all");
-              setTipo("all");
-            }}
-          >
-            Restablecer filtros
-          </button>
-        </section>
-      )}
-      {tab === "atenciones" && (
-        <section className="grid gap-3">
-          <h3 className="text-lg font-bold">{atenciones.length} atenciones encontradas</h3>
-          {atenciones.length ? (
-            atenciones.map((a) => <Encounter key={a.id} a={a} />)
-          ) : (
-            <p className={panel}>No hay atenciones para los filtros indicados.</p>
-          )}
-        </section>
-      )}
-      {tab === "examenes" && (
-        <section className="grid gap-3">
-          <h3 className="text-lg font-bold">{examenes.length} resultados de exámenes</h3>
-          {examenes.length ? (
-            <div className="grid gap-3 lg:grid-cols-2">
-              {examenes.map((e) => (
-                <DatosExamen key={`${e.sistema}-${e.idLocal}`} e={e} />
-              ))}
+          {r.medicamentos.length ? (
+            <div className="tabla-ex">
+              <table className="w-full text-left text-[0.92rem]">
+                <thead>
+                  <tr className={`${etiqueta} border-b border-line`}>
+                    <th className="py-2 pr-3 font-medium">Medicamento</th>
+                    <th className="py-2 pr-3 font-medium">Estado</th>
+                    <th className="py-2 pr-3 font-medium">Desde</th>
+                    <th className="py-2 font-medium">Sede</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {r.medicamentos.map((m) => {
+                    const f = m.fuentes[0];
+                    const activo = vigente(m);
+                    return (
+                      <tr key={m.nombre} className="border-b border-line/70 last:border-0">
+                        <td className="py-2.5 pr-3 font-medium">{m.nombre}</td>
+                        <td data-label="Estado" className="py-2.5 pr-3">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[0.78rem] font-semibold ${activo ? "bg-ok-bg text-ok" : "bg-surface-2 text-muted"}`}
+                          >
+                            {activo ? "Activo" : "Finalizado"}
+                          </span>
+                        </td>
+                        <td data-label="Desde" className="whitespace-nowrap py-2.5 pr-3 text-muted tabular-nums">
+                          {f?.fecha ? dateOnly(f.fecha) : "—"}
+                        </td>
+                        <td data-label="Sede" className="py-2.5 text-muted">
+                          {m.fuentes.map((x) => x.lugar).join(", ")}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           ) : (
-            <p className={panel}>No hay exámenes para los filtros elegidos.</p>
+            <Vacio>No hay medicamentos registrados.</Vacio>
+          )}
+          {!paraPaciente && activos.length > 0 && (
+            <p className="mt-3 text-[0.84rem] text-muted">Confirme con el paciente si los sigue tomando.</p>
           )}
         </section>
       )}
+
+      {tab === "informes" && (
+        <div className="grid gap-4">
+          <div className="no-imprimir flex justify-end">
+            <button type="button" className={`${btn.ghost} ${btn.sm}`} onClick={() => window.print()}>
+              <Printer size={16} aria-hidden /> Imprimir
+            </button>
+          </div>
+          {r.atenciones
+            .filter((a) => a.examenes.length)
+            .map((a) => (
+              <section className={panel} key={a.id}>
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h3 className="font-semibold">{a.establecimiento}</h3>
+                  <p className="text-[0.86rem] text-muted tabular-nums">{dateTime(a.fechaHora)}</p>
+                </div>
+                <div className="mt-3">
+                  <TablaExamenes lista={a.examenes} conSede={false} />
+                </div>
+              </section>
+            ))}
+          {!r.atenciones.some((a) => a.examenes.length) && <Vacio>No hay informes.</Vacio>}
+        </div>
+      )}
+
       {tab === "previos" && !paraPaciente && (
         <section className={panel}>
-          <h3 className="text-xl font-bold">Revisar estudios previos antes de solicitar un examen</h3>
-          <p className="mt-2 text-sm text-muted">
-            Herramienta informativa para localizar un estudio anterior con el mismo código normalizado. No
-            evalúa la necesidad clínica, no crea una orden ni evita un examen.
-          </p>
-          <label className="mt-4 grid max-w-lg gap-1.5 text-sm font-semibold">
-            Examen a revisar
-            <select className={cls} value={codigoPedido} onChange={(e) => setCodigoPedido(e.target.value)}>
+          <label className="flex flex-wrap items-center gap-3 text-[0.92rem] font-medium">
+            ¿Qué examen piensa pedir?
+            <select className={control} value={codigoPedido} onChange={(e) => setCodigoPedido(e.target.value)}>
               {Object.entries(EXAMENES).map(([codigo, info]) => (
                 <option key={codigo} value={codigo}>
                   {info.nombre}
@@ -522,142 +564,26 @@ export function Historia({ r, paraPaciente = false }: { r: Resumen; paraPaciente
               ))}
             </select>
           </label>
-          <div className="mt-4 grid gap-3">
-            {(() => {
-              const lista = r.examenes
-                .filter((e) => e.codigo === codigoPedido)
-                .sort((a, b) => b.fecha.localeCompare(a.fecha));
-              const umbral = EXAMENES[codigoPedido]?.dias ?? 30;
-              if (!lista.length)
-                return (
-                  <p className="rounded-ctl bg-surface-2 p-4 text-sm">
-                    No se encontraron estudios previos en las fuentes disponibles. Esto no confirma que nunca
-                    se haya realizado.
-                  </p>
-                );
-              return (
-                <>
-                  <p className="rounded-ctl border border-warn-line bg-warn-bg p-3 text-sm">
-                    Se encontraron {lista.length} resultados del mismo tipo. La ventana orientativa de{" "}
-                    {umbral} días es un parámetro técnico de demostración, no una regla clínica de repetición.
-                  </p>
-                  {lista.map((e) => (
-                    <DatosExamen key={`${e.sistema}-${e.idLocal}`} e={e} />
-                  ))}
-                </>
-              );
-            })()}
-          </div>
-        </section>
-      )}
-      {tab === "tratamientos" && (
-        <section className={panel}>
-          <h3 className="text-xl font-bold">Tratamientos activos e históricos</h3>
-          <p className="mt-2 text-sm text-muted">
-            Se conserva la fecha de inicio, la fecha de finalización cuando consta y la fuente que registró el
-            tratamiento. Las dosis son transcripciones ficticias, no indicaciones médicas.
-          </p>
-          <div className="mt-4 grid gap-3">
-            {r.medicamentos.map((m) => (
-              <div key={m.nombre} className="rounded-ctl border border-line p-4">
-                <p className="font-semibold">{m.nombre}</p>
-                {m.fuentes.map((f, i) => (
-                  <div key={`${i}-${f.clave}`} className="mt-2 text-sm">
-                    <span
-                      className={`mr-2 rounded-full px-2 py-0.5 text-xs ${f.estado === "active" ? "bg-warn-bg text-warn" : "bg-surface-2 text-muted"}`}
-                    >
-                      {f.estado === "active"
-                        ? "Registrado activo; uso por confirmar"
-                        : "Finalizado según registro"}
-                    </span>
-                    <span className="text-muted">
-                      {f.lugar} · Inicio {dateOnly(f.fecha)} ·{" "}
-                      {f.fin ? "Fin " + dateOnly(f.fin) : "Fin no consignado"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ))}
-            {!r.medicamentos.length && (
-              <p className="text-sm text-muted">No hay tratamientos documentados.</p>
-            )}
-          </div>
-        </section>
-      )}
-      {tab === "documentos" && (
-        <section className="grid gap-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-lg font-bold">Informes sintéticos por atención</h3>
-            <button type="button" className={`${btn.secondary} print:hidden`} onClick={() => window.print()}>
-              Imprimir vista
-            </button>
-          </div>
-          <p className="text-xs text-muted">
-            Informes de ejemplo generados a partir de los resultados. No son PDF originales de hospitales
-            reales, carecen de firma clínica válida y no deben usarse como documentos médicos.
-          </p>
-          {atenciones
-            .filter((a) => a.examenes.length)
-            .map((a) => (
-              <section className={panel} key={a.id}>
-                <div className="flex flex-wrap justify-between gap-2">
-                  <div>
-                    <p className="text-xs font-bold uppercase text-accent-strong">
-                      Informe clínico sintético · DEMO
-                    </p>
-                    <h4 className="mt-1 text-lg font-bold">{a.establecimiento}</h4>
-                    <p className="text-xs text-muted">
-                      Atención {a.id} · {dateTime(a.fechaHora)}
-                    </p>
-                  </div>
-                  <p className="text-sm text-muted">{a.profesional} · DEMOSTRACIÓN</p>
-                </div>
-                <p className="mt-3 text-sm">
-                  Paciente: {r.nombre} · DNI ficticio: {r.dni}
-                </p>
-                <div className="mt-4 overflow-x-auto">
-                  <table className="w-full min-w-[470px] text-left text-sm">
-                    <thead className="border-b border-line text-xs text-muted">
-                      <tr>
-                        <th className="py-2 pr-3">Prueba</th>
-                        <th className="py-2 pr-3">Resultado</th>
-                        <th className="py-2 pr-3">Referencia</th>
-                        <th className="py-2">Muestra</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {a.examenes.map((e) => (
-                        <tr key={e.idLocal} className="border-b border-line/70">
-                          <td className="py-2 pr-3">{e.nombre}</td>
-                          <td className="py-2 pr-3 font-semibold tabular-nums">{e.resultado}</td>
-                          <td className="py-2 pr-3 text-xs">{str(e.referencia)}</td>
-                          <td className="py-2 text-xs">{str(e.muestra)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <p className="mt-4 text-xs text-muted">
-                  Fecha de muestra y emisión modeladas para demostración. Validación clínica externa
-                  pendiente. Fuente simulada {a.sistema}.
-                </p>
-              </section>
-            ))}
-          {!atenciones.some((a) => a.examenes.length) && (
-            <p className={panel}>No se encontraron informes con esos filtros.</p>
+          {previos[0] ? (
+            <p
+              className={`mt-4 rounded-ctl border px-3.5 py-3 text-[0.95rem] ${dias(previos[0].fecha) <= ventana ? "border-warn-line bg-warn-bg" : "border-line bg-surface-2/50"}`}
+            >
+              Último: <strong className="font-semibold tabular-nums">{previos[0].resultado}</strong>,{" "}
+              {hace(previos[0].fecha)} en {previos[0].establecimiento}.
+              {dias(previos[0].fecha) <= ventana && " Revíselo antes de pedir otro."}
+            </p>
+          ) : (
+            <p className="mt-4 rounded-ctl bg-surface-2/60 px-3.5 py-3 text-[0.95rem] text-muted">
+              No hay resultados previos de este examen.
+            </p>
+          )}
+          {previos.length > 0 && (
+            <div className="mt-4">
+              <TablaExamenes lista={previos} />
+            </div>
           )}
         </section>
       )}
-      {version && (
-        <p className="text-xs text-muted">
-          Nombres oficiales de los exámenes verificados en el servicio de terminología de HL7 (tx.fhir.org),
-          LOINC {version}.
-        </p>
-      )}
-      <p className="text-xs leading-relaxed text-muted">
-        Importante: los rangos son orientativos y dependen de edad, sexo, embarazo, método y laboratorio. Los
-        valores sintéticos y sus categorías no constituyen diagnósticos ni recomendaciones de tratamiento.
-      </p>
     </article>
   );
 }

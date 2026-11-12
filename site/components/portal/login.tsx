@@ -1,22 +1,26 @@
 "use client";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowRight, QrCode } from "@phosphor-icons/react";
 import { fetchPortal, ErrorBlock } from "./shared";
-import { btn, contenedor, panel } from "@/components/ui";
+import { btn, campo } from "@/components/ui";
+import { KipuMarca, Logo, QuipuArte } from "@/components/marca";
+import { BotonTema } from "@/components/tema";
+
 type Role = "medico" | "paciente";
+
 export function LoginForm({ almacenListo = true }: { almacenListo?: boolean }) {
   const router = useRouter(),
-    [role, setRole] = useState<Role>("medico"),
-    [correo, setCorreo] = useState("medico.demo@sjl.test"),
-    [password, setPassword] = useState("DemoMedico2026!"),
-    [documento, setDocumento] = useState("CMP-DEMO-001"),
+    [role, setRole] = useState<Role>("paciente"),
+    [correo, setCorreo] = useState(""),
+    [password, setPassword] = useState(""),
+    [documento, setDocumento] = useState(""),
     [loading, setLoading] = useState(false),
     [error, setError] = useState("");
   const elegir = (r: Role) => {
+    if (r === role) return;
     setRole(r);
-    setCorreo(r === "medico" ? "medico.demo@sjl.test" : "paciente01@demo.sjl.test");
-    setPassword(r === "medico" ? "DemoMedico2026!" : "DemoPaciente2026!");
-    setDocumento(r === "medico" ? "CMP-DEMO-001" : "90000001");
+    setDocumento("");
     setError("");
   };
   const enviar = async (e: FormEvent) => {
@@ -29,134 +33,136 @@ export function LoginForm({ almacenListo = true }: { almacenListo?: boolean }) {
       router.refresh();
     } catch (e) {
       setError((e as Error).message);
-    } finally {
       setLoading(false);
     }
   };
+  const medico = role === "medico";
   return (
-    <div className={`${contenedor} grid gap-7 py-10 lg:grid-cols-[1.05fr_.95fr] lg:gap-12 lg:py-16`}>
-      <div className="flex flex-col justify-center">
-        <p className="text-xs font-bold uppercase tracking-[.13em] text-accent-strong">
-          UNI · Design Thinking · Prototipo educativo
-        </p>
-        <h1 className="mt-3 max-w-xl text-[clamp(2.3rem,4.8vw,4.6rem)] font-bold leading-[1.05]">
-          Tu historia de salud, sin empezar de cero.
-        </h1>
-        <p className="mt-5 max-w-xl text-lg leading-relaxed text-muted">
-          Un resumen clínico longitudinal que reúne atenciones y resultados de redes ficticias de Minsa,
-          EsSalud y clínicas de San Juan de Lurigancho, con permisos otorgados por el paciente.
-        </p>
-        <div className="mt-8 grid gap-3 sm:grid-cols-2">
-          <div className={panel}>
-            <p className="text-sm font-bold">Profesionales</p>
-            <p className="mt-1 text-sm text-muted">
-              Solicitan acceso por DNI y consultan únicamente historias autorizadas.
-            </p>
-          </div>
-          <div className={panel}>
-            <p className="text-sm font-bold">Pacientes</p>
-            <p className="mt-1 text-sm text-muted">
-              Revisan sus registros, aprueban solicitudes y consultan auditoría.
-            </p>
-          </div>
+    <div className="grid min-h-dvh lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
+      <aside className="relative hidden overflow-hidden bg-[#1d2f5c] text-[#f4f1ea] lg:flex lg:flex-col lg:justify-between lg:p-12 xl:p-16">
+        <span className="inline-flex items-center gap-2.5">
+          <KipuMarca className="size-8" />
+          <span className="font-display text-[1.45rem] font-semibold tracking-[-0.02em]">Kipu</span>
+        </span>
+        <QuipuArte className="pointer-events-none absolute -right-10 top-[14%] w-[min(92%,560px)] text-[#f4f1ea]/85" />
+        <div className="relative max-w-[30rem]">
+          <h1 className="font-display text-[clamp(2.6rem,1.4rem+2.6vw,3.9rem)] font-semibold leading-[1.02] tracking-[-0.03em]">
+            Tu historia clínica, contigo.
+          </h1>
+          <p className="mt-5 max-w-[38ch] text-[1.08rem] leading-relaxed text-[#f4f1ea]/75">
+            Tus atenciones del Minsa, EsSalud y clínicas en un solo lugar. Tú decides qué médico la ve y por
+            cuánto tiempo.
+          </p>
         </div>
-      </div>
-      <section className={panel}>
-        <div
-          className="mb-5 inline-flex rounded-ctl border border-line bg-surface-2 p-1"
-          role="group"
-          aria-label="Tipo de usuario"
-        >
-          <button
-            type="button"
-            aria-pressed={role === "medico"}
-            onClick={() => elegir("medico")}
-            className={`rounded-md px-4 py-2 text-sm font-semibold ${role === "medico" ? "bg-surface text-ink shadow-sm" : "text-muted"}`}
-          >
-            Soy médico
-          </button>
-          <button
-            type="button"
-            aria-pressed={role === "paciente"}
-            onClick={() => elegir("paciente")}
-            className={`rounded-md px-4 py-2 text-sm font-semibold ${role === "paciente" ? "bg-surface text-ink shadow-sm" : "text-muted"}`}
-          >
-            Soy paciente
-          </button>
+      </aside>
+
+      <main id="principal" tabIndex={-1} className="flex flex-col px-5 py-6 outline-none sm:px-10 lg:px-14">
+        <div className="flex items-center justify-between">
+          <Logo className="lg:invisible" />
+          <BotonTema />
         </div>
-        <h2 className="text-2xl font-bold">Iniciar sesión</h2>
-        <p className="mt-2 text-sm text-muted">
-          Cuentas sintéticas, creadas para la exposición. Las contraseñas de ejemplo no deben utilizarse con
-          datos reales.
-        </p>
-        <form onSubmit={enviar} className="mt-6 grid gap-4">
-          <label className="grid gap-1.5 text-sm font-semibold">
-            {role === "medico" ? "Colegiatura de demostración" : "DNI ficticio"}
-            <input
-              required
-              type="text"
-              autoComplete="off"
-              inputMode={role === "paciente" ? "numeric" : "text"}
-              value={documento}
-              onChange={(e) => setDocumento(e.target.value)}
-              className="min-h-12 rounded-ctl border border-line bg-bg px-3 font-normal"
-            />
-          </label>
-          <label className="grid gap-1.5 text-sm font-semibold">
-            Correo electrónico
-            <input
-              required
-              autoComplete="username"
-              type="email"
-              value={correo}
-              onChange={(e) => setCorreo(e.target.value)}
-              className="min-h-12 rounded-ctl border border-line bg-bg px-3 font-normal"
-            />
-          </label>
-          <label className="grid gap-1.5 text-sm font-semibold">
-            Contraseña
-            <input
-              required
-              autoComplete="current-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="min-h-12 rounded-ctl border border-line bg-bg px-3 font-normal"
-            />
-          </label>
-          {!almacenListo && (
-            <div
-              role="alert"
-              className="rounded-ctl border border-warn-line bg-warn-bg px-4 py-3 text-sm text-ink"
+
+        <div className="mx-auto flex w-full max-w-[25rem] flex-1 flex-col justify-center py-10">
+          <h2 className="font-display text-[2rem] font-semibold tracking-[-0.025em]">Ingresar</h2>
+          <p className="mt-1.5 text-muted">
+            {medico ? "Accede a las historias que tus pacientes te autorizaron." : "Revisa tu historia y decide quién la ve."}
+          </p>
+
+          <div
+            role="radiogroup"
+            aria-label="Tipo de cuenta"
+            className="mt-7 grid grid-cols-2 rounded-ctl bg-surface-2 p-1"
+          >
+            {(
+              [
+                ["paciente", "Soy paciente"],
+                ["medico", "Soy médico"],
+              ] as const
+            ).map(([k, t]) => (
+              <button
+                key={k}
+                type="button"
+                role="radio"
+                aria-checked={role === k}
+                onClick={() => elegir(k)}
+                className={`min-h-10 rounded-[6px] text-[0.92rem] font-semibold transition-[background-color,color,box-shadow] duration-150 ${role === k ? "bg-surface text-ink shadow-card" : "text-muted hover:text-ink"}`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+
+          <form onSubmit={enviar} className="mt-6 grid gap-4">
+            <label className="grid gap-1.5 text-[0.88rem] font-medium">
+              {medico ? "Número de colegiatura (CMP)" : "DNI"}
+              <input
+                required
+                type="text"
+                autoComplete="off"
+                inputMode={medico ? "text" : "numeric"}
+                maxLength={medico ? 20 : 8}
+                value={documento}
+                onChange={(e) => setDocumento(medico ? e.target.value : e.target.value.replace(/\D/g, ""))}
+                className={`${campo} font-mono tracking-wide`}
+                placeholder={medico ? "CMP-000000" : "8 dígitos"}
+              />
+            </label>
+            <label className="grid gap-1.5 text-[0.88rem] font-medium">
+              Correo electrónico
+              <input
+                required
+                autoComplete="username"
+                type="email"
+                value={correo}
+                onChange={(e) => setCorreo(e.target.value)}
+                className={campo}
+                placeholder="nombre@correo.com"
+              />
+            </label>
+            <label className="grid gap-1.5 text-[0.88rem] font-medium">
+              Contraseña
+              <input
+                required
+                autoComplete="current-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={campo}
+              />
+            </label>
+            {!almacenListo && (
+              <ErrorBlock mensaje="El servicio no está disponible en este momento. Inténtalo de nuevo más tarde." />
+            )}
+            {error && <ErrorBlock mensaje={error} />}
+            <button className={`${btn.primary} mt-2 w-full`} type="submit" disabled={loading || !almacenListo}>
+              {loading ? "Verificando…" : "Ingresar"}
+              {!loading && <ArrowRight size={17} weight="bold" aria-hidden />}
+            </button>
+          </form>
+
+          {medico && (
+            <a
+              href="/leer"
+              className="group mt-8 flex items-center gap-3.5 rounded-card border border-line p-4 no-underline transition-colors hover:bg-surface"
             >
-              <strong>Falta configurar el almacén.</strong> En Vercel el portal necesita una base Redis para
-              guardar sesiones y autorizaciones. Conecta Upstash Redis al proyecto (Storage, Marketplace) y
-              vuelve a desplegar.
-            </div>
+              <span className="grid size-10 shrink-0 place-items-center rounded-ctl bg-accent-soft text-accent-strong">
+                <QrCode size={21} aria-hidden />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[0.92rem] font-semibold text-ink">¿Atiendes sin internet?</span>
+                <span className="block text-[0.84rem] text-muted">Lee el carné QR del paciente sin ingresar.</span>
+              </span>
+              <ArrowRight
+                size={17}
+                className="text-muted transition-transform duration-150 group-hover:translate-x-0.5"
+                aria-hidden
+              />
+            </a>
           )}
-          {error && <ErrorBlock mensaje={error} />}
-          <button className={`${btn.primary} mt-1 w-full`} type="submit" disabled={loading || !almacenListo}>
-            {loading ? "Verificando..." : "Acceder al portal"}
-          </button>
-        </form>
-        <div className="mt-5 rounded-ctl bg-surface-2 p-4 text-sm">
-          <strong>Credenciales de prueba</strong>
-          <p className="mt-1 break-words text-muted">
-            {role === "medico"
-              ? "CMP-DEMO-001 · medico.demo@sjl.test · DemoMedico2026!"
-              : "paciente01@demo.sjl.test · DemoPaciente2026! · DNI 90000001"}
-          </p>
-          <p className="mt-2 text-xs text-muted">
-            Seleccionar el tipo de usuario rellena una cuenta ficticia. No se valida contra CMP, RENIEC ni
-            servicios reales.
-          </p>
         </div>
-        <p className="mt-4 text-xs leading-relaxed text-muted">
-          En una versión productiva, el alta de médicos requeriría validar identidad, CMP y vínculo
-          institucional. Para pacientes se necesitaría acreditar identidad antes de activar la cuenta; no se
-          habilita autorregistro inseguro por DNI.
-        </p>
-      </section>
+
+        <p className="text-center text-[0.8rem] text-muted lg:text-left">© 2026 Kipu</p>
+      </main>
     </div>
   );
 }

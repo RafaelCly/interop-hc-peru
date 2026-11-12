@@ -85,7 +85,12 @@ function alertasPrevias(es: Examen[]): Alerta[] {
   }
   return alerts.sort((a, b) => b.fechaRepeticion.localeCompare(a.fechaRepeticion));
 }
+// Las fuentes FHIR marcan sus sedes como simuladas; la interfaz muestra el nombre de la sede sin esa marca.
 export function clinicalSummary(dni: string, omitir?: Clave): Resumen | null {
+  const r = armarResumen(dni, omitir);
+  return r && (JSON.parse(JSON.stringify(r).replace(/ \(simulad[oa]\)/g, "")) as Resumen);
+}
+function armarResumen(dni: string, omitir?: Clave): Resumen | null {
   const matches = keys.map((k) => {
     const st = stores[k];
     const p = [...st.pacientes.values()].find((p: any) => p.identifier.some((id: any) => id.value === dni));

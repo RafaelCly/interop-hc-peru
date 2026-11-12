@@ -88,6 +88,21 @@ export interface AlertaSeguridad {
   vigente: boolean;
 }
 
+// Resultado que el propio paciente aportó (por ejemplo, una foto de un resultado en papel leída con IA y
+// confirmada por él). No lo verificó ninguna fuente: se muestra aparte de los datos de las redes.
+export interface ResultadoAportado {
+  id: string;
+  codigo: string;
+  nombre: string;
+  valor?: number;
+  unidad?: string;
+  resultado: string;
+  fecha: string;
+  laboratorio: string;
+  metodo: "ia" | "manual";
+  creado: string;
+}
+
 export interface Resumen {
   dni: string;
   nombre: string;
@@ -101,5 +116,6 @@ export interface Resumen {
   repetidos: Alerta[];
   seguridad: AlertaSeguridad[];
   atenciones: Atencion[];
+  aportados?: ResultadoAportado[];
   traza: { total: number; sistemas: TrazaSistema[]; examenes: number; traducidos: number };
 }

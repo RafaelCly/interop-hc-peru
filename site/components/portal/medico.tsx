@@ -1,43 +1,95 @@
 "use client";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import type { SafeUser } from "@/lib/server/auth";
-import type { Resumen } from "@/lib/tipos";
-import { btn, panel } from "@/components/ui";
 import {
-  PortalLayout,
+  ArrowRight,
+  CalendarCheck,
+  ChatCircleText,
+  ClockCounterClockwise,
+  FirstAidKit,
+  PaperPlaneTilt,
+  QrCode,
+  WifiSlash,
+  Stethoscope,
+  UsersThree,
+} from "@phosphor-icons/react";
+import type { SafeUser, EstadoCita } from "@/lib/server/auth";
+import type { Resumen } from "@/lib/tipos";
+import { btn, campo, panel } from "@/components/ui";
+import {
+  Shell,
+  Encabezado,
+  AvisoOk,
   fetchPortal,
   ErrorBlock,
   LoadingBlock,
   Pill,
   dateTime,
   Audits,
+  type ItemNav,
   type SolicitudView,
   type EventView,
 } from "./shared";
 import { Historia } from "./historia";
-type View = "solicitudes" | "historia" | "auditoria";
+
+type View = "pacientes" | "historia" | "auditoria";
+interface CitaView {
+  id: string;
+  hora: string;
+  motivo: string;
+  dni: string;
+  paciente: string;
+  estado: EstadoCita;
+}
+
+const vigente = (s: SolicitudView) => s.estado === "aprobada" && (!s.expira || Date.parse(s.expira) > Date.now());
+const hora = (iso: string) =>
+  new Date(iso).toLocaleTimeString("es-PE", { hour: "numeric", minute: "2-digit", timeZone: "America/Lima" });
+const iniciales = (n: string) =>
+  n
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((x) => x[0])
+    .join("")
+    .toUpperCase();
+const VIA: Record<string, string> = { qr: "con su llave QR", sms: "con código SMS", solicitud: "autorizado", atencion: "desde su cita" };
+
+function Tarjeta({ icono: I, titulo, children, id }: { icono: typeof QrCode; titulo: string; children: React.ReactNode; id: string }) {
+  return (
+    <section className={panel} aria-labelledby={id}>
+      <h2 id={id} className="flex items-center gap-2 text-[1.05rem] font-semibold">
+        <I size={19} className="text-accent" aria-hidden /> {titulo}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
 export function PortalMedico({ user }: { user: SafeUser }) {
-  const [view, setView] = useState<View>("solicitudes"),
+  const [view, setView] = useState<View>("pacientes"),
     [solicitudes, setSolicitudes] = useState<SolicitudView[]>([]),
+    [agenda, setAgenda] = useState<CitaView[]>([]),
     [eventos, setEventos] = useState<EventView[]>([]),
-    [dni, setDni] = useState("90000001"),
-    [finalidad, setFinalidad] = useState("Consulta clínica y continuidad de atención del paciente"),
+    [dni, setDni] = useState(""),
+    [finalidad, setFinalidad] = useState("Consulta médica y continuidad de la atención"),
     [msg, setMsg] = useState(""),
     [error, setError] = useState(""),
     [sending, setSending] = useState(false),
     [loading, setLoading] = useState(true),
     [historia, setHistoria] = useState<Resumen | null>(null),
     [seleccionado, setSeleccionado] = useState(""),
-    [omitir, setOmitir] = useState(""),
-    [codigo, setCodigo] = useState(""),
+    [smsDni, setSmsDni] = useState(""),
+    [smsAviso, setSmsAviso] = useState(""),
+    [smsCodigo, setSmsCodigo] = useState(""),
     [emDni, setEmDni] = useState(""),
     [emMotivo, setEmMotivo] = useState(""),
-    [emAbierto, setEmAbierto] = useState(false);
+    [emAbierto, setEmAbierto] = useState(false),
+    [solAbierto, setSolAbierto] = useState(false);
   const recargar = useCallback(async () => {
     try {
-      const [a, b] = await Promise.all([fetchPortal("solicitudes"), fetchPortal("auditoria")]);
+      const [a, b, c] = await Promise.all([fetchPortal("solicitudes"), fetchPortal("auditoria"), fetchPortal("agenda")]);
       setSolicitudes(a.solicitudes);
       setEventos(b.eventos);
+      setAgenda(c.citas);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -47,7 +99,7 @@ export function PortalMedico({ user }: { user: SafeUser }) {
   useEffect(() => {
     void recargar();
   }, [recargar]);
-  // Al revocar el paciente, se oculta una vista ya abierta en la siguiente comprobación.
+  // Si el paciente retira el permiso, la historia abierta se oculta en la siguiente comprobación.
   useEffect(() => {
     if (view !== "historia" || !seleccionado || !historia) return;
     let vivo = true;
@@ -55,16 +107,9 @@ export function PortalMedico({ user }: { user: SafeUser }) {
       try {
         const r = await fetchPortal("solicitudes");
         if (!vivo) return;
-        const vigente = r.solicitudes.some(
-          (s: SolicitudView) =>
-            s.dni === seleccionado &&
-            s.estado === "aprobada" &&
-            s.expira &&
-            Date.parse(s.expira) > Date.now(),
-        );
-        if (!vigente) {
+        if (!r.solicitudes.some((s: SolicitudView) => s.dni === seleccionado && vigente(s))) {
           setHistoria(null);
-          setError("La autorización dejó de estar vigente. Se ocultó el expediente.");
+          setError("El permiso para ver esta historia terminó. Se cerró la historia.");
         }
       } catch {
         if (vivo) setHistoria(null);
@@ -78,14 +123,18 @@ export function PortalMedico({ user }: { user: SafeUser }) {
       window.removeEventListener("focus", comprobar);
     };
   }, [view, seleccionado, historia]);
-  const solicitar = async (e: FormEvent) => {
-    e.preventDefault();
+  const limpiarAvisos = () => {
     setError("");
     setMsg("");
+  };
+  const solicitar = async (e: FormEvent) => {
+    e.preventDefault();
+    limpiarAvisos();
     setSending(true);
     try {
       const r = await fetchPortal("solicitar", "POST", { dni, finalidad });
       setMsg(r.mensaje);
+      setDni("");
       await recargar();
     } catch (e) {
       setError((e as Error).message);
@@ -93,17 +142,14 @@ export function PortalMedico({ user }: { user: SafeUser }) {
       setSending(false);
     }
   };
-  const ver = async (d: string, fuente = "") => {
-    setError("");
+  const ver = async (d: string) => {
+    limpiarAvisos();
     setHistoria(null);
     setSeleccionado(d);
-    setOmitir(fuente);
     setView("historia");
     setSending(true);
     try {
-      const r = await fetchPortal(
-        `historial?dni=${encodeURIComponent(d)}${fuente ? `&omitir=${encodeURIComponent(fuente)}` : ""}`,
-      );
+      const r = await fetchPortal(`historial?dni=${encodeURIComponent(d)}`);
       setHistoria(r.resumen);
       await recargar();
     } catch (e) {
@@ -112,16 +158,20 @@ export function PortalMedico({ user }: { user: SafeUser }) {
       setSending(false);
     }
   };
-  const abrirConAcceso = async (accion: "canjear-llave" | "emergencia", cuerpo: object) => {
-    setError("");
-    setMsg("");
+  const abrirConAcceso = async (
+    accion: "emergencia" | "abrir-atencion" | "verificar-sms",
+    cuerpo: object,
+  ) => {
+    limpiarAvisos();
     setSending(true);
     try {
-      const r = (await fetchPortal(accion, "POST", cuerpo)) as { dni: string; mensaje: string };
-      setMsg(r.mensaje);
-      setCodigo("");
+      const r = (await fetchPortal(accion, "POST", cuerpo)) as { dni: string };
       setEmMotivo("");
+      setEmDni("");
       setEmAbierto(false);
+      setSmsCodigo("");
+      setSmsAviso("");
+      setSmsDni("");
       await recargar();
       await ver(r.dni);
     } catch (e) {
@@ -129,304 +179,412 @@ export function PortalMedico({ user }: { user: SafeUser }) {
       setSending(false);
     }
   };
-  // Al escanear el QR del paciente con la cámara, el enlace trae el código y se canjea solo.
-  useEffect(() => {
-    const c = new URLSearchParams(window.location.search).get("llave");
-    if (!c) return;
-    window.history.replaceState(null, "", window.location.pathname);
-    void abrirConAcceso("canjear-llave", { codigo: c });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const enviarSms = async (e?: FormEvent) => {
+    e?.preventDefault();
+    limpiarAvisos();
+    setSending(true);
+    try {
+      const r = await fetchPortal("enviar-sms", "POST", { dni: smsDni });
+      setSmsAviso(r.mensaje);
+      await recargar();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSending(false);
+    }
+  };
+  const ir = (k: string) => {
+    setView(k as View);
+    limpiarAvisos();
+  };
+  const pedirCodigo = (d: string) => {
+    setSmsDni(d);
+    setSmsAviso("");
+    setSmsCodigo("");
+    document.getElementById("sms-dni")?.focus();
+  };
+
+  const conAcceso = solicitudes.filter(vigente);
+  // Pacientes con acceso que no están en la agenda de hoy, uno por paciente.
+  const enAgenda = new Set(agenda.map((c) => c.dni));
+  const otrosConAcceso = [...new Map(conAcceso.filter((s) => !enAgenda.has(s.dni)).map((s) => [s.dni, s])).values()];
+  const otras = solicitudes.filter((s) => !vigente(s) && s.via !== "atencion");
+  const paciente = historia?.nombre ?? conAcceso.find((s) => s.dni === seleccionado)?.paciente;
+  // Para el selector de la historia: pacientes con acceso, sin repetir.
+  const elegibles = [...new Map(conAcceso.map((s) => [s.dni, s])).values()];
+
+  const items: ItemNav[] = [
+    { k: "pacientes", t: "Mis pacientes", icono: UsersThree, insignia: agenda.length },
+    { k: "historia", t: "Historia clínica", icono: Stethoscope },
+    { k: "auditoria", t: "Mi actividad", icono: ClockCounterClockwise },
+  ];
+
   return (
-    <PortalLayout
-      user={user}
-      title="Espacio médico"
-      lead="Solicita autorización y consulta registros clínicos sintéticos por atención. El acceso se limita a los pacientes que lo hayan autorizado en el portal del titular."
-    >
-      <div className="mb-5 grid gap-3 sm:grid-cols-3">
-        <div className={panel}>
-          <p className="text-xs font-semibold uppercase text-muted">CMP</p>
-          <p className="mt-2 font-bold">{user.cmp}</p>
-          <p className="mt-1 text-xs text-warn">{user.habilitacion}</p>
-        </div>
-        <div className={`${panel} sm:col-span-2`}>
-          <p className="text-xs font-semibold uppercase text-muted">Establecimiento declarativo</p>
-          <p className="mt-2 font-bold">{user.establecimiento}</p>
-          <p className="mt-1 text-xs text-muted">
-            No existe validación automatizada contra CMP, RENIPRESS o el empleador.
-          </p>
-        </div>
-      </div>
-      <div className="mb-5 flex flex-wrap gap-2" role="navigation" aria-label="Secciones del médico">
-        {[
-          { k: "solicitudes", t: "Solicitudes de acceso" },
-          { k: "historia", t: "Visor clínico" },
-          { k: "auditoria", t: "Mi actividad" },
-        ].map((x) => (
-          <button
-            type="button"
-            key={x.k}
-            aria-current={view === x.k ? "page" : undefined}
-            onClick={() => setView(x.k as View)}
-            className={`${view === x.k ? btn.primary : btn.secondary} !px-4`}
-          >
-            {x.t}
-          </button>
-        ))}
-      </div>
-      {msg && (
-        <div role="status" className="mb-4 rounded-ctl border border-ok-line bg-ok-bg p-3 text-sm">
-          {msg}
-        </div>
-      )}
-      {error && (
-        <div className="mb-4">
-          <ErrorBlock mensaje={error} />
-        </div>
-      )}
-      {view === "solicitudes" && (
-        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
-          <section className={panel}>
-            <h2 className="text-xl font-bold">Solicitar historia clínica</h2>
-            <p className="mt-2 text-sm text-muted">
-              Ingrese el DNI sintético y explique la finalidad. La solicitud aparecerá en la cuenta del
-              paciente; el médico no puede aprobarla por sí mismo.
-            </p>
-            <form onSubmit={solicitar} className="mt-5 grid gap-3">
-              <label className="grid gap-1 text-sm font-semibold">
-                DNI sintético
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  required
-                  pattern="[0-9]{8}"
-                  maxLength={8}
-                  value={dni}
-                  onChange={(e) => setDni(e.target.value.replace(/\D/g, ""))}
-                  className="min-h-11 rounded-ctl border border-line bg-bg px-3 font-normal"
-                  placeholder="90000001"
-                />
-              </label>
-              <label className="grid gap-1 text-sm font-semibold">
-                Finalidad de la solicitud
-                <textarea
-                  required
-                  minLength={10}
-                  maxLength={300}
-                  rows={4}
-                  value={finalidad}
-                  onChange={(e) => setFinalidad(e.target.value)}
-                  className="rounded-ctl border border-line bg-bg p-3 font-normal"
-                />
-              </label>
-              <button type="submit" disabled={sending} className={btn.primary}>
-                {sending ? "Enviando..." : "Enviar solicitud al paciente"}
-              </button>
-            </form>
-            <div className="mt-5 grid gap-3 rounded-ctl border border-line p-3.5">
-              <p className="text-sm font-bold">Entrar con el código del paciente</p>
-              <p className="-mt-2 text-xs text-muted">
-                En consulta presencial, el paciente muestra su llave QR. Escanéala con la cámara o escribe el
-                código.
-              </p>
-              <form
-                className="flex flex-wrap items-end gap-2"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void abrirConAcceso("canjear-llave", { codigo });
-                }}
-              >
-                <label className="grid flex-1 gap-1 text-xs font-semibold">
-                  Código
-                  <input
-                    className="min-h-11 rounded-ctl border border-line bg-bg px-3 font-mono text-base uppercase tracking-widest"
-                    value={codigo}
-                    maxLength={9}
-                    placeholder="ABCD-2345"
-                    onChange={(e) => setCodigo(e.target.value)}
-                  />
-                </label>
-                <button type="submit" disabled={sending || codigo.replace(/\W/g, "").length < 8} className={btn.secondary}>
-                  Abrir historial
-                </button>
-              </form>
-            </div>
-            <div className="mt-3 rounded-ctl border border-danger-line bg-danger-bg p-3.5">
-              <button
-                type="button"
-                className="text-sm font-bold text-danger underline"
-                aria-expanded={emAbierto}
-                onClick={() => setEmAbierto(!emAbierto)}
-              >
-                Acceso de emergencia (paciente sin poder autorizar)
-              </button>
-              {emAbierto && (
-                <form
-                  className="mt-3 grid gap-3"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void abrirConAcceso("emergencia", { dni: emDni, motivo: emMotivo });
-                  }}
-                >
-                  <p className="text-xs text-ink">
-                    Solo si el paciente no puede autorizar. Dura 1 hora, queda registrado con tu nombre y se
-                    informa al paciente, que puede revocarlo.
-                  </p>
-                  <label className="grid gap-1 text-xs font-semibold text-ink">
-                    DNI del paciente
-                    <input
-                      className="min-h-11 rounded-ctl border border-line bg-bg px-3 text-base font-normal"
-                      inputMode="numeric"
-                      pattern="[0-9]{8}"
-                      maxLength={8}
-                      required
-                      value={emDni}
-                      onChange={(e) => setEmDni(e.target.value.replace(/\D/g, ""))}
-                    />
-                  </label>
-                  <label className="grid gap-1 text-xs font-semibold text-ink">
-                    Motivo de la emergencia
-                    <textarea
-                      className="rounded-ctl border border-line bg-bg p-3 text-base font-normal"
-                      rows={2}
-                      required
-                      minLength={15}
-                      maxLength={300}
-                      value={emMotivo}
-                      placeholder="Ej.: paciente inconsciente en emergencia, requiere antecedentes y alergias"
-                      onChange={(e) => setEmMotivo(e.target.value)}
-                    />
-                  </label>
-                  <button type="submit" disabled={sending} className={btn.primary}>
-                    Confirmar acceso de emergencia
-                  </button>
-                </form>
-              )}
-            </div>
-            <div className="mt-5 rounded-ctl bg-surface-2 p-3 text-sm">
-              <p className="font-bold">Cómo probar el circuito</p>
-              <p className="mt-1 text-muted">
-                Solicita acceso a 90000001. Cierra sesión y entra con paciente01@demo.sjl.test. Aprueba la
-                solicitud, vuelve a ingresar como médico y abre el historial.
-              </p>
-            </div>
-          </section>
-          <section className={panel}>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-xl font-bold">Solicitudes registradas</h2>
-              <button type="button" className={`${btn.secondary} ${btn.sm}`} onClick={() => void recargar()}>
-                Actualizar
-              </button>
-            </div>
-            {loading ? (
-              <LoadingBlock />
-            ) : (
-              <div className="mt-4 grid gap-3">
-                {solicitudes.length === 0 && (
-                  <p className="text-sm text-muted">No hay solicitudes todavía.</p>
-                )}
-                {solicitudes.map((s) => {
-                  const autorizado =
-                    s.estado === "aprobada" && Boolean(s.expira) && Date.parse(s.expira!) > Date.now();
-                  return (
-                    <article key={s.id} className="rounded-ctl border border-line p-3.5">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div>
-                          <p className="text-sm font-bold">DNI ficticio {s.dni}</p>
-                          <p className="text-xs text-muted">{s.paciente}</p>
-                        </div>
-                        <span className="flex items-center gap-2">
-                          {s.via === "qr" && <span className="text-xs font-semibold text-accent-strong">Llave QR</span>}
-                          {s.via === "emergencia" && <span className="text-xs font-semibold text-danger">Emergencia</span>}
-                          <Pill
-                            status={autorizado ? s.estado : s.estado === "aprobada" ? "Vencida" : s.estado}
-                          />
-                        </span>
-                      </div>
-                      <p className="mt-2 text-sm">{s.finalidad}</p>
-                      <p className="mt-1 text-xs text-muted">
-                        Solicitada {dateTime(s.creada)}
-                        {s.expira ? ` · Vence ${dateTime(s.expira)}` : ""}
-                      </p>
-                      {autorizado && (
-                        <button
-                          type="button"
-                          onClick={() => void ver(s.dni)}
-                          className={`${btn.primary} ${btn.sm} mt-3`}
-                        >
-                          Consultar historial autorizado
-                        </button>
-                      )}
-                    </article>
-                  );
-                })}
+    <Shell user={user} items={items} activo={view} onCambiar={ir}>
+      <div key={view} className="vista">
+        {view === "pacientes" && (
+          <>
+            <Encabezado
+              titulo={`Hola, ${user.nombre.split(" ").slice(0, 2).join(" ")}`}
+              bajada="Al abrir la historia de un paciente quedas como su médico tratante, hasta que él te retire el acceso. Para alguien sin cita, pídele el código que le llega por SMS."
+            />
+            {msg && <AvisoOk>{msg}</AvisoOk>}
+            {error && (
+              <div className="mb-5">
+                <ErrorBlock mensaje={error} />
               </div>
             )}
-          </section>
-        </div>
-      )}
-      {view === "historia" && (
-        <div className="grid gap-4">
-          <section className={panel}>
-            <h2 className="text-lg font-bold">Visor del paciente autorizado</h2>
-            <p className="mt-1 text-sm text-muted">
-              Seleccione un paciente con permiso vigente. El sistema vuelve a validar permisos en cada
-              consulta.
-            </p>
-            <div className="mt-3 flex flex-wrap items-end gap-3">
-              <label className="grid min-w-48 gap-1 text-xs font-semibold">
-                Paciente autorizado
-                <select
-                  className="min-h-11 rounded-ctl border border-line bg-bg px-3 text-sm"
-                  value={seleccionado}
-                  onChange={(e) => {
-                    setSeleccionado(e.target.value);
-                    setHistoria(null);
-                  }}
+            <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
+              <div className="grid min-w-0 gap-5">
+                <section className={panel} aria-labelledby="h-agenda">
+                  <h2 id="h-agenda" className="flex items-center gap-2 text-[1.05rem] font-semibold">
+                    <CalendarCheck size={19} className="text-accent" aria-hidden /> Citas de hoy
+                    <span className="font-normal text-muted tabular-nums">· {agenda.length}</span>
+                  </h2>
+                  {loading ? (
+                    <div className="mt-4 grid gap-3">
+                      <div className="sk h-14" />
+                      <div className="sk h-14" />
+                    </div>
+                  ) : agenda.length ? (
+                    <ul className="mt-2 divide-y divide-line">
+                      {agenda.map((c) => (
+                        <li key={c.id} className="flex flex-wrap items-center gap-x-4 gap-y-3 py-3.5 last:pb-0">
+                          <span className="w-12 shrink-0 font-mono text-[0.9rem] font-semibold tabular-nums">{c.hora}</span>
+                          <div className="min-w-[10rem] flex-1">
+                            <p className="truncate font-semibold">{c.paciente}</p>
+                            <p className="text-[0.84rem] text-muted">{c.motivo}</p>
+                          </div>
+                          {c.estado === "libre" || c.estado === "abierta" ? (
+                            <button
+                              type="button"
+                              disabled={sending}
+                              onClick={() => void abrirConAcceso("abrir-atencion", { cita: c.id })}
+                              className={`${c.estado === "abierta" ? btn.secondary : btn.primary} ${btn.sm} max-sm:w-full`}
+                            >
+                              Abrir historia <ArrowRight size={15} weight="bold" aria-hidden />
+                            </button>
+                          ) : (
+                            <span className="flex flex-wrap items-center gap-2 max-sm:w-full">
+                              <span className="text-[0.82rem] text-muted">
+                                {c.estado === "retirado" ? "Retiró el permiso" : "Pide autorizar en cada consulta"}
+                              </span>
+                              <button type="button" onClick={() => pedirCodigo(c.dni)} className={`${btn.ghost} ${btn.sm}`}>
+                                Pedir código
+                              </button>
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-4 text-[0.92rem] text-muted">Hoy no tienes citas registradas por admisión.</p>
+                  )}
+                </section>
+
+                {(otrosConAcceso.length > 0 || otras.length > 0) && (
+                  <section className={panel} aria-labelledby="h-acceso">
+                    <h2 id="h-acceso" className="text-[1.05rem] font-semibold">
+                      Otros pacientes con acceso{" "}
+                      <span className="font-normal text-muted tabular-nums">· {otrosConAcceso.length}</span>
+                    </h2>
+                    {otrosConAcceso.length > 0 ? (
+                      <ul className="mt-2 divide-y divide-line">
+                        {otrosConAcceso.map((s) => (
+                          <li key={s.id} className="flex flex-wrap items-center gap-x-4 gap-y-3 py-3.5 last:pb-0">
+                            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-surface-2 text-[0.85rem] font-semibold">
+                              {iniciales(s.paciente)}
+                            </span>
+                            <div className="min-w-[11rem] flex-1">
+                              <p className="truncate font-semibold">{s.paciente}</p>
+                              <p className="text-[0.84rem] text-muted">
+                                {s.expira ? `Hasta las ${hora(s.expira)} · ` : "Médico tratante · "}
+                                {s.via === "emergencia" ? (
+                                  <span className="font-medium text-danger">emergencia</span>
+                                ) : (
+                                  VIA[s.via ?? "solicitud"]
+                                )}
+                              </p>
+                            </div>
+                            <button type="button" onClick={() => void ver(s.dni)} className={`${btn.primary} ${btn.sm} max-sm:w-full`}>
+                              Abrir historia <ArrowRight size={15} weight="bold" aria-hidden />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-3 text-[0.9rem] text-muted">Nadie más por ahora.</p>
+                    )}
+                    {otras.length > 0 && (
+                      <details className="mt-5 border-t border-line pt-4">
+                        <summary className="cursor-pointer text-[0.9rem] font-medium text-muted hover:text-ink">
+                          Solicitudes pendientes y anteriores · {otras.length}
+                        </summary>
+                        <ul className="mt-2 divide-y divide-line">
+                          {otras.map((s) => (
+                            <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-[0.9rem]">
+                              <span className="min-w-0">
+                                <span className="font-medium">{s.paciente}</span>{" "}
+                                <span className="font-mono text-[0.82rem] text-muted">DNI {s.dni}</span>
+                                <span className="block text-[0.8rem] text-muted">{dateTime(s.creada)}</span>
+                              </span>
+                              <Pill status={s.estado === "aprobada" ? "Vencida" : s.estado} />
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
+                  </section>
+                )}
+              </div>
+
+              <div className="grid gap-4">
+                <Tarjeta icono={ChatCircleText} titulo="Código por SMS" id="h-sms">
+                  <p className="mt-1 text-[0.86rem] text-muted">Le llega al celular del paciente y te lo dicta.</p>
+                  {!smsAviso ? (
+                    <form className="mt-3 flex gap-2" onSubmit={enviarSms}>
+                      <label className="sr-only" htmlFor="sms-dni">
+                        DNI del paciente
+                      </label>
+                      <input
+                        id="sms-dni"
+                        name="dni-paciente-sms"
+                        data-1p-ignore
+                        data-lpignore="true"
+                        data-bwignore
+                        data-form-type="other"
+                        className={`${campo} font-mono tracking-wide`}
+                        inputMode="numeric"
+                        pattern="[0-9]{8}"
+                        maxLength={8}
+                        placeholder="DNI"
+                        autoComplete="off"
+                        value={smsDni}
+                        onChange={(e) => setSmsDni(e.target.value.replace(/\D/g, ""))}
+                      />
+                      <button type="submit" disabled={sending || smsDni.length !== 8} className={`${btn.primary} shrink-0`}>
+                        Enviar
+                      </button>
+                    </form>
+                  ) : (
+                    <form
+                      className="mt-3 grid gap-2"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void abrirConAcceso("verificar-sms", { dni: smsDni, codigo: smsCodigo });
+                      }}
+                    >
+                      <p role="status" className="text-[0.86rem]">
+                        {smsAviso}
+                      </p>
+                      <div className="flex gap-2">
+                        <label className="sr-only" htmlFor="sms-codigo">
+                          Código de seis dígitos
+                        </label>
+                        <input
+                          id="sms-codigo"
+                          name="codigo-sms"
+                          data-1p-ignore
+                          data-lpignore="true"
+                          data-bwignore
+                          data-form-type="other"
+                          autoFocus
+                          className={`${campo} font-mono text-[1.1rem] tracking-[0.3em]`}
+                          inputMode="numeric"
+                          autoComplete="off"
+                          maxLength={6}
+                          placeholder="000000"
+                          value={smsCodigo}
+                          onChange={(e) => setSmsCodigo(e.target.value.replace(/\D/g, ""))}
+                        />
+                        <button type="submit" disabled={sending || smsCodigo.length !== 6} className={`${btn.primary} shrink-0`}>
+                          Abrir
+                        </button>
+                      </div>
+                      <div className="flex gap-3 text-[0.84rem]">
+                        <button type="button" className="font-medium text-accent-strong hover:underline" onClick={() => void enviarSms()}>
+                          Reenviar
+                        </button>
+                        <button
+                          type="button"
+                          className="text-muted hover:text-ink"
+                          onClick={() => {
+                            setSmsAviso("");
+                            setSmsCodigo("");
+                          }}
+                        >
+                          Otro paciente
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </Tarjeta>
+
+                <section className="rounded-card border border-line p-4">
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 text-left text-[0.92rem] font-semibold"
+                    aria-expanded={solAbierto}
+                    onClick={() => setSolAbierto(!solAbierto)}
+                  >
+                    <PaperPlaneTilt size={19} className="text-accent" aria-hidden /> Pedir acceso a distancia
+                  </button>
+                  {solAbierto ? (
+                    <form onSubmit={solicitar} className="mt-3 grid gap-3">
+                      <label className="grid gap-1.5 text-[0.86rem] font-medium">
+                        DNI del paciente
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          required
+                          pattern="[0-9]{8}"
+                          maxLength={8}
+                          value={dni}
+                          onChange={(e) => setDni(e.target.value.replace(/\D/g, ""))}
+                          className={`${campo} font-mono tracking-wide`}
+                          placeholder="8 dígitos"
+                        />
+                      </label>
+                      <label className="grid gap-1.5 text-[0.86rem] font-medium">
+                        Motivo
+                        <textarea
+                          required
+                          minLength={10}
+                          maxLength={300}
+                          rows={2}
+                          value={finalidad}
+                          onChange={(e) => setFinalidad(e.target.value)}
+                          className={`${campo} py-2.5`}
+                        />
+                      </label>
+                      <button type="submit" disabled={sending} className={btn.secondary}>
+                        {sending ? "Enviando…" : "Enviar solicitud"}
+                      </button>
+                    </form>
+                  ) : (
+                    <p className="mt-1 text-[0.84rem] text-muted">Para revisar antes de una interconsulta.</p>
+                  )}
+                </section>
+
+                <section className="rounded-card border border-danger-line p-4">
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 text-left text-[0.92rem] font-semibold text-danger"
+                    aria-expanded={emAbierto}
+                    onClick={() => setEmAbierto(!emAbierto)}
+                  >
+                    <FirstAidKit size={19} aria-hidden /> Acceso de emergencia
+                  </button>
+                  {emAbierto ? (
+                    <form
+                      className="mt-3 grid gap-3"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void abrirConAcceso("emergencia", { dni: emDni, motivo: emMotivo });
+                      }}
+                    >
+                      <p className="text-[0.84rem] text-muted">
+                        Solo si el paciente no puede autorizar. Dura una hora, queda registrado con tu nombre y el
+                        paciente lo verá.
+                      </p>
+                      <label className="grid gap-1.5 text-[0.86rem] font-medium">
+                        DNI del paciente
+                        <input
+                          className={`${campo} font-mono`}
+                          inputMode="numeric"
+                          pattern="[0-9]{8}"
+                          maxLength={8}
+                          required
+                          value={emDni}
+                          onChange={(e) => setEmDni(e.target.value.replace(/\D/g, ""))}
+                        />
+                      </label>
+                      <label className="grid gap-1.5 text-[0.86rem] font-medium">
+                        Motivo de la emergencia
+                        <textarea
+                          className={`${campo} py-2.5`}
+                          rows={2}
+                          required
+                          minLength={15}
+                          maxLength={300}
+                          value={emMotivo}
+                          placeholder="Ej.: paciente inconsciente, se necesitan sus alergias y antecedentes"
+                          onChange={(e) => setEmMotivo(e.target.value)}
+                        />
+                      </label>
+                      <button type="submit" disabled={sending} className={btn.peligro}>
+                        Abrir por emergencia
+                      </button>
+                    </form>
+                  ) : (
+                    <p className="mt-1 text-[0.84rem] text-muted">Para un paciente que no puede autorizar.</p>
+                  )}
+                </section>
+
+                <a
+                  href="/leer"
+                  className="flex items-center gap-2 rounded-ctl px-1 py-1.5 text-[0.86rem] text-muted no-underline hover:text-ink"
                 >
-                  <option value="">Elegir paciente</option>
-                  {solicitudes
-                    .filter((s) => s.estado === "aprobada" && s.expira && Date.parse(s.expira) > Date.now())
-                    .map((s) => (
-                      <option key={s.id} value={s.dni}>
-                        DNI {s.dni}
-                      </option>
-                    ))}
-                </select>
-              </label>
-              <label className="grid min-w-44 gap-1 text-xs font-semibold">
-                Simular fuente caída
-                <select
-                  className="min-h-11 rounded-ctl border border-line bg-bg px-3 text-sm"
-                  value={omitir}
-                  onChange={(e) => setOmitir(e.target.value)}
-                >
-                  <option value="">Ninguna</option>
-                  <option value="minsa">Minsa</option>
-                  <option value="essalud">EsSalud</option>
-                  <option value="clinica">Clínica privada</option>
-                </select>
-              </label>
-              <button
-                type="button"
-                disabled={!seleccionado || sending}
-                className={btn.primary}
-                onClick={() => void ver(seleccionado, omitir)}
-              >
-                {sending ? "Cargando..." : "Consultar"}
-              </button>
+                  <WifiSlash size={17} aria-hidden /> ¿Sin internet? Leer el carné QR del paciente
+                </a>
+              </div>
             </div>
-          </section>
-          {sending && <LoadingBlock />}
-          {historia && <Historia key={`${historia.dni}-${omitir}`} r={historia} />}
-          {!historia && !sending && (
-            <p className="text-sm text-muted">
-              La información clínica solo aparecerá si existe autorización vigente.
-            </p>
-          )}
-        </div>
-      )}
-      {view === "auditoria" && <Audits events={eventos} />}
-    </PortalLayout>
+          </>
+        )}
+
+        {view === "historia" && (
+          <>
+            <Encabezado
+              titulo="Historia clínica"
+              bajada={paciente ? undefined : "Elige un paciente de tus citas de hoy o uno que te haya dado acceso."}
+              acciones={
+                elegibles.length > 0 && (
+                  <label className="flex items-center gap-2 text-[0.88rem] text-muted">
+                    <span className="sr-only sm:not-sr-only">Paciente</span>
+                    <select
+                      className="min-h-10 rounded-ctl border border-line bg-surface px-3 text-[0.9rem] text-ink"
+                      value={seleccionado}
+                      onChange={(e) => e.target.value && void ver(e.target.value)}
+                    >
+                      <option value="">Elegir paciente</option>
+                      {elegibles.map((s) => (
+                        <option key={s.id} value={s.dni}>
+                          {s.paciente} · {s.dni}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )
+              }
+            />
+            {error && (
+              <div className="mb-5">
+                <ErrorBlock mensaje={error} />
+              </div>
+            )}
+            {sending && <LoadingBlock />}
+            {historia && <Historia key={historia.dni} r={historia} />}
+            {!historia && !sending && (
+              <div className={`${panel} grid place-items-center gap-3 py-12 text-center`}>
+                <Stethoscope size={34} className="text-muted/60" aria-hidden />
+                <p className="max-w-[44ch] text-muted">
+                  {elegibles.length ? "Elige un paciente para abrir su historia." : "Abre la historia desde tus citas de hoy."}
+                </p>
+                <button type="button" className={`${btn.ghost} ${btn.sm}`} onClick={() => ir("pacientes")}>
+                  Ir a mis pacientes
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+        {view === "auditoria" && (
+          <>
+            <Encabezado titulo="Mi actividad" bajada="Todo lo que hiciste en Kipu, con fecha y hora." />
+            <Audits events={eventos} />
+          </>
+        )}
+      </div>
+    </Shell>
   );
 }
