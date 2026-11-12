@@ -349,7 +349,6 @@ export async function requestAccess(doctor: DemoUser, dni: string, finalidad: st
   await writeState(s);
   return "Solicitud enviada. El paciente la verá en su cuenta.";
 }
-const unaHora = () => new Date(Date.now() + 3600_000).toISOString();
 export async function accesoEmergencia(
   doctor: DemoUser,
   dni: string,
@@ -372,13 +371,13 @@ export async function accesoEmergencia(
     estado: "aprobada",
     creada: iso(),
     decidida: iso(),
-    expira: unaHora(),
+    // Sin plazo: una emergencia puede seguir en observación u hospitalización. Lo cierra el paciente.
     via: "emergencia",
   };
   s.solicitudes.unshift(x);
-  addEvent(s, doctor.id, "acceso_emergencia", `Acceso de emergencia sin autorización previa · ${motivo}`, paciente.id, x.id);
+  addEvent(s, doctor.id, "acceso_emergencia", `Acceso de emergencia sin autorización previa, hasta que el paciente lo retire · ${motivo}`, paciente.id, x.id);
   await writeState(s);
-  return { dni, mensaje: "Acceso de emergencia por 1 hora. Quedó registrado y el paciente será informado." };
+  return { dni, mensaje: "Acceso de emergencia abierto hasta que el paciente lo retire. Quedó registrado y el paciente lo verá en su cuenta." };
 }
 export async function decide(
   patient: DemoUser,

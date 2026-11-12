@@ -298,7 +298,7 @@ export function PortalMedico({ user }: { user: SafeUser }) {
                             <div className="min-w-[11rem] flex-1">
                               <p className="truncate font-semibold">{s.paciente}</p>
                               <p className="text-[0.84rem] text-muted">
-                                {s.expira ? `Hasta las ${hora(s.expira)} · ` : "Médico tratante · "}
+                                {s.expira ? `Hasta las ${hora(s.expira)} · ` : s.via === "emergencia" ? "Sin plazo · " : "Médico tratante · "}
                                 {s.via === "emergencia" ? (
                                   <span className="font-medium text-danger">emergencia</span>
                                 ) : (
@@ -484,8 +484,8 @@ export function PortalMedico({ user }: { user: SafeUser }) {
                       }}
                     >
                       <p className="text-[0.84rem] text-muted">
-                        Solo si el paciente no puede autorizar. Dura una hora, queda registrado con tu nombre y el
-                        paciente lo verá.
+                        Solo si el paciente no puede autorizar. Queda abierto hasta que el paciente lo retire, se
+                        registra con tu nombre y el paciente lo verá en su cuenta.
                       </p>
                       <label className="grid gap-1.5 text-[0.86rem] font-medium">
                         DNI del paciente

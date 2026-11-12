@@ -36,17 +36,19 @@ Estas credenciales son públicas y no protegen información real.
 
 1. Entrar como médica (`CMP-DEMO-001`). **Mis pacientes** muestra sus **Citas de hoy** (la agenda que en producción
    registra admisión). Pulsar **Abrir historia** en la cita de las 08:00: se abre sin pedir nada al paciente, solo
-   para la médica de esa cita y solo hasta el fin del día. Recorrer **Resumen**, **Atenciones**, **Exámenes**,
+   para la médica de esa cita, que queda como médica tratante hasta que el paciente le retire el acceso. Recorrer **Resumen**, **Atenciones**, **Exámenes**,
    **Medicamentos**, **Informes** y **Antes de pedir un examen**.
 2. Paciente sin cita: en **Código por SMS**, escribir el DNI `90000009` y pulsar **Enviar**. En otra ventana, entrar
    como paciente `90000009`: en **Autorizaciones** aparece el SMS con el código de seis dígitos. Escribirlo en el
-   portal de la médica y pulsar **Abrir** (acceso de una hora, un solo uso, cinco intentos como máximo).
-3. Como paciente `90000001`, en **Autorizaciones**, la cita figura como acceso activo **En tu cita** y se puede
-   **Retirar permiso**. El interruptor **Durante tus citas** desactiva este acceso: desde entonces la médica ve
+   portal de la médica y pulsar **Abrir** (el código sirve una vez, vence en 10 minutos y admite cinco intentos; la médica queda como tratante hasta que el
+   paciente le retire el acceso).
+3. Como paciente `90000001`, en **Autorizaciones**, la médica figura como **Médico tratante**, sin fecha de fin, y se
+   puede **Retirar permiso**. El interruptor **Durante tus citas** desactiva este acceso: desde entonces la médica ve
    "Pide autorizar en cada consulta" y debe usar el código SMS.
 4. **Quién vio mi historia** muestra cada apertura, con el canal usado.
 5. Siguen disponibles **Pedir acceso a distancia** (el paciente lo aprueba desde su cuenta, útil antes de una
-   interconsulta) y el **Acceso de emergencia**. Sin internet, el enlace **¿Sin internet? Leer el carné QR** abre el
+   interconsulta) y el **Acceso de emergencia** (pide el motivo, tiene límite diario y queda abierto
+   hasta que el paciente lo retire; el paciente ve un aviso en su cuenta). Sin internet, el enlace **¿Sin internet? Leer el carné QR** abre el
    lector del carné firmado. La llave QR de consulta se retiró: la cita y el código SMS cubren ese caso.
 6. Si se retira un permiso con la historia abierta, se oculta en la siguiente verificación (al volver a enfocar la
    pestaña o cada 15 s). Esto no puede borrar información ya vista.
@@ -60,7 +62,8 @@ Estas credenciales son públicas y no protegen información real.
   producción. Límite de 5 intentos fallidos por cuenta (bloqueo de 15 minutos) y validación de `Origin` en los POST.
 - Acceso a un expediente solo por el propio paciente o por el médico destinatario de una autorización vigente,
   comprobado en cada consulta.
-- Acceso durante la cita: el médico de una cita del día abre la historia sin pasos extra; vence al terminar el día.
+- Acceso durante la cita: el médico de una cita del día abre la historia sin pasos extra y queda como médico
+  tratante, sin vencimiento, hasta que el paciente le retire el acceso.
   Se basa en un consentimiento que el paciente da una vez y puede desactivar, y cada acceso se puede retirar.
 - Código por SMS de seis dígitos para pacientes sin cita o sin smartphone: vence en 10 minutos, sirve una vez, se
   invalida tras cinco intentos y queda en la bitácora. El envío real requiere un proveedor de SMS; en el prototipo el
