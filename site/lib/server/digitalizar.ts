@@ -1,6 +1,5 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
-import Anthropic from "@anthropic-ai/sdk";
 import { EXAMENES } from "@/lib/catalogo-clinico";
 import type { ResultadoAportado } from "@/lib/tipos";
 import { addEvent, readState, writeState, type DemoUser, type LecturaIA } from "./auth";
@@ -15,7 +14,9 @@ import { addEvent, readState, writeState, type DemoUser, type LecturaIA } from "
  * resultado queda guardado por el hash de la imagen; la imagen no se guarda).
  */
 
-const MODELO = "claude-opus-5-5";
+// Si el primero está saturado (503/429), se intenta con el siguiente.
+const MODELOS = ["gemini-flash-latest", "gemini-flash-lite-latest"];
+const urlGemini = (m: string) => `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`;
 const LIMITE_DIARIO = 10;
 const MAX_BASE64 = 4_000_000;
 const TIPOS = ["image/jpeg", "image/png", "image/webp"] as const;
@@ -107,40 +108,49 @@ function validarLectura(x: unknown): LecturaResultado {
 }
 
 async function pedirALaIA(imagen: string, tipo: TipoImagen): Promise<LecturaResultado> {
-  if (!process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN)
-    throw Error("La lectura con IA no está configurada en este servidor (falta ANTHROPIC_API_KEY).");
-  const client = new Anthropic();
-  let respuesta: Anthropic.Beta.BetaMessage;
-  try {
-    respuesta = await client.beta.messages.create({
-      model: MODELO,
-      max_tokens: 16000,
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-      output_config: { effort: "low", format: { type: "json_schema", schema: ESQUEMA } },
-      system: SISTEMA,
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "image", source: { type: "base64", media_type: tipo, data: imagen } },
-            { type: "text", text: "Transcribe este resultado según las reglas." },
-          ],
-        },
-      ],
-    });
-  } catch (e) {
-    if (e instanceof Anthropic.AuthenticationError) throw Error("La clave de la IA no es válida en este servidor.");
-    if (e instanceof Anthropic.RateLimitError) throw Error("La IA está ocupada. Intente en unos minutos.");
-    if (e instanceof Anthropic.BadRequestError) throw Error("La IA no pudo procesar esta imagen. Pruebe con otra foto.");
-    if (e instanceof Anthropic.APIError) throw Error("La IA no respondió. Intente más tarde.");
-    throw Error("No se pudo conectar con la IA. Revise la conexión e intente otra vez.");
+  const clave = process.env.GEMINI_API_KEY;
+  if (!clave) throw Error("La lectura con IA no está configurada en este servidor (falta GEMINI_API_KEY).");
+  const cuerpo = JSON.stringify({
+    systemInstruction: { parts: [{ text: SISTEMA }] },
+    contents: [
+      {
+        role: "user",
+        parts: [{ inlineData: { mimeType: tipo, data: imagen } }, { text: "Transcribe este resultado según las reglas." }],
+      },
+    ],
+    generationConfig: { temperature: 0, responseMimeType: "application/json", responseJsonSchema: ESQUEMA },
+  });
+  let r: Response | undefined;
+  for (const modelo of MODELOS) {
+    try {
+      r = await fetch(urlGemini(modelo), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": clave },
+        body: cuerpo,
+        signal: AbortSignal.timeout(90_000),
+      });
+    } catch (e) {
+      if (e instanceof Error && e.name === "TimeoutError") throw Error("La IA tardó demasiado. Intente otra vez.");
+      throw Error("No se pudo conectar con la IA. Revise la conexión e intente otra vez.");
+    }
+    if (r.status !== 503 && r.status !== 429) break;
   }
-  if (respuesta.stop_reason === "refusal") throw Error("La IA no procesó esta imagen. Pruebe con otra foto.");
-  const bloque = respuesta.content.find((b) => b.type === "text");
-  if (!bloque || bloque.type !== "text") throw Error("La IA no devolvió datos. Intente con otra foto.");
+  if (!r) throw Error("La IA no respondió. Intente más tarde.");
+  if (!r.ok) console.error("Gemini", r.status, (await r.clone().text()).slice(0, 300));
+  if (r.status === 400) throw Error("La IA no pudo procesar esta imagen. Pruebe con otra foto.");
+  if (r.status === 401 || r.status === 403) throw Error("La clave de la IA no es válida en este servidor.");
+  if (r.status === 429) throw Error("La IA está ocupada. Intente en unos minutos.");
+  if (!r.ok) throw Error("La IA no respondió. Intente más tarde.");
+  const datos = (await r.json()) as {
+    candidates?: { finishReason?: string; content?: { parts?: { text?: string; thought?: boolean }[] } }[];
+  };
+  const candidato = datos.candidates?.[0];
+  if (!candidato || candidato.finishReason === "SAFETY" || candidato.finishReason === "PROHIBITED_CONTENT")
+    throw Error("La IA no procesó esta imagen. Pruebe con otra foto.");
+  const texto = (candidato.content?.parts ?? []).filter((x) => !x.thought && x.text).map((x) => x.text).join("");
+  if (!texto) throw Error("La IA no devolvió datos. Intente con otra foto.");
   try {
-    return validarLectura(JSON.parse(bloque.text));
+    return validarLectura(JSON.parse(texto));
   } catch {
     throw Error("La IA devolvió una respuesta incompleta. Intente con otra foto.");
   }

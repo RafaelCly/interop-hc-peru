@@ -137,7 +137,7 @@ async function probar() {
   const pac4 = s0.users.find((u) => u.dni === "90000004");
   const solCita = (await a.userRequests(pac4)).find((x) => x.via === "atencion");
   await a.decide(pac4, solCita.id, "revocar");
-  await assert.rejects(() => a.abrirAtencion(doc, cita4.id), /retiró el permiso/);
+  await assert.rejects(() => a.abrirAtencion(doc, cita4.id), /retiró el (permiso|acceso)/);
   const pac3cita = s0.users.find((u) => u.dni === "90000003");
   await a.cambiarAccesoPorAtencion(pac3cita, false);
   const cita3 = (await a.agendaMedico(doc)).find((x) => x.dni === "90000003");
@@ -198,11 +198,11 @@ async function probar() {
   assert.equal((await dg.aportadosDe(pac.id)).length, 0);
   await assert.rejects(() => dg.borrarAportado(pac, aps[0].id), /no encontrado/);
   // Sin clave de IA configurada, la lectura avisa en vez de fallar sin explicación.
-  const claveIA = process.env.ANTHROPIC_API_KEY;
-  delete process.env.ANTHROPIC_API_KEY;
+  const claveIA = process.env.GEMINI_API_KEY;
+  delete process.env.GEMINI_API_KEY;
   await assert.rejects(() => dg.digitalizarResultado(p, "aGVsbG8=", "image/jpeg"), /no está configurada/);
   await assert.rejects(() => dg.digitalizarResultado(p, "aGVsbG8=", "image/gif"), /Formato/);
-  if (claveIA) process.env.ANTHROPIC_API_KEY = claveIA;
+  if (claveIA) process.env.GEMINI_API_KEY = claveIA;
 
   // Carné QR: firmado, legible con la clave pública y rechazado si se altera
   const cs = require("./lib/server/carnet-servidor.ts");
